@@ -21,7 +21,7 @@ namespace maps {
 
 namespace icons {
 	int id;
-	float scale = 0.33f;
+	float scale = 0.38f;
 	std::unordered_map<int, ID3D11ShaderResourceView*> iconTextures;
 	std::unordered_map<int, int> iconWidths;
 	std::unordered_map<int, int> iconHeights;
@@ -183,6 +183,8 @@ void gui::gameLoop(CGame game) {
 	//ID3D11ShaderResourceView* texture = fetchMap(mapName);
 	ID3D11ShaderResourceView* texture = maps::mapTextures[mapName];
 	renderMap(texture);
+	renderIcons(game);
+	renderAimLines(game);
 	renderPlayers(game);
 	ImGui::End();
 }
@@ -193,14 +195,50 @@ void gui::renderMap(ID3D11ShaderResourceView* texture) {
 	ImGui::Begin("MAP", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
 	ImGui::Image((void*)texture, ImVec2(1024, 1024));
 }
-void gui::renderPlayers(CGame game) {
+
+void gui::renderIcons(CGame game) {
 	for (int i = 1; i <= 64; i++) {
-		//Checking for controller and health
 		if (game.players[i - 1].controller == NULL) continue;
 		if (game.players[i - 1].health == 0) continue;
-		//local data - using this to make the code for drawing simple/clean
+		//Not drawing team weapons/util
+		if (game.players[i - 1].teamID == game.localPlayer.teamID) continue;
+		float x, y, z, angle;
+		ImVec2 windowPos = ImGui::GetWindowPos();
+		x = game.players[i - 1].position.x;
+		y = game.players[i - 1].position.y;
+		z = game.players[i - 1].position.z;
+		//aim line\angle data
+		angle = game.players[i - 1].eyeAngles.y;
+		angle = angle * 3.14159265f / 180.0f;
+		worldToRadar(x, y, game);
+
+		int weaponID = game.players[i - 1].weaponID;
+		float iconW = (float)icons::iconWidths[weaponID] * icons::scale;
+		float iconH = (float)icons::iconHeights[weaponID] * icons::scale;
+		ImVec2 iconPos;
+		if (angle <= 3.14159265f && angle >= 0) {
+			// below the dot
+			iconPos = ImVec2(windowPos.x + x - (iconW / 2), (windowPos.y + y) + 10.f);
+		}
+		else {
+			// above the dot
+			iconPos = ImVec2(windowPos.x + x - (iconW / 2), (windowPos.y + y) - 10.f - iconH);
+		}
+
+		ImGui::GetForegroundDrawList()->AddImage(
+			(ImTextureID)icons::iconTextures[weaponID],
+			iconPos,
+			ImVec2(iconPos.x + iconW, iconPos.y + iconH),
+			ImVec2(0, 0), ImVec2(1, 1),
+			IM_COL32(255, 255, 255, 255)
+		);
+	}
+}
+void gui::renderAimLines(CGame game) {
+	for (int i = 1; i <= 64; i++) {
+		if (game.players[i - 1].controller == NULL) continue;
+		if (game.players[i - 1].health == 0) continue;
 		float x, y, z, angle, length;
-		ImU32 dotColor;
 		float opacity;
 		ImVec2 windowPos = ImGui::GetWindowPos();
 		x = game.players[i - 1].position.x;
@@ -208,11 +246,28 @@ void gui::renderPlayers(CGame game) {
 		z = game.players[i - 1].position.z;
 		//aim line\angle data
 		angle = game.players[i - 1].eyeAngles.y;
-		length = 35.0f;
 		angle = angle * 3.14159265f / 180.0f;
-		//Gets our rendering position based on map bounds
 		worldToRadar(x, y, game);
-
+		opacity = setOpacity(game.localPlayer.position.z, z, game);
+		length = 35.0f;
+		//Aim lines
+		ImVec2 endpoint = ImVec2(windowPos.x + x + length * cos(angle) + 1.0f, windowPos.y + y + length * sin(angle) * -1 + 1.0f);
+		ImGui::GetForegroundDrawList()->AddLine(ImVec2((windowPos.x + x), (windowPos.y + y)), endpoint, IM_COL32(1, 1, 1, opacity), 6.5f);
+		ImGui::GetForegroundDrawList()->AddLine(ImVec2((windowPos.x + x), (windowPos.y + y)), endpoint, IM_COL32(255, 255, 255, opacity), 4.0f);
+	}
+}
+void gui::renderPlayers(CGame game) {
+	for (int i = 1; i <= 64; i++) {
+		if (game.players[i - 1].controller == NULL) continue;
+		if (game.players[i - 1].health == 0) continue;
+		float x, y, z;
+		ImU32 dotColor;
+		float opacity;
+		ImVec2 windowPos = ImGui::GetWindowPos();
+		x = game.players[i - 1].position.x;
+		y = game.players[i - 1].position.y;
+		z = game.players[i - 1].position.z;
+		worldToRadar(x, y, game);
 		opacity = setOpacity(game.localPlayer.position.z, z, game);
 		//Only fetching colors for team - no need for enemy. they will all be red
 		if (game.players[i - 1].teamID == game.localPlayer.teamID) {
@@ -225,52 +280,12 @@ void gui::renderPlayers(CGame game) {
 		if (game.players[i - 1].controller == game.localPlayer.controller) {
 			dotColor = IM_COL32(255, 255, 255, 255);
 		}
-		
-
-		//Aim lines
-		ImVec2 endpoint = ImVec2(windowPos.x + x + length * cos(angle) + 1.0f, windowPos.y + y + length * sin(angle) * -1 + 1.0f);
-		ImGui::GetForegroundDrawList()->AddLine(ImVec2((windowPos.x + x), (windowPos.y + y)), endpoint, IM_COL32(1, 1, 1, opacity), 6.5f);
-		ImGui::GetForegroundDrawList()->AddLine(ImVec2((windowPos.x + x), (windowPos.y + y)), endpoint, IM_COL32(255, 255, 255, opacity), 4.0f);
-
 		//Players
 		ImGui::GetForegroundDrawList()->AddCircleFilled(ImVec2((windowPos.x + x), (windowPos.y + y)), 8.25f, IM_COL32(0, 0, 0, 255));
 		ImGui::GetForegroundDrawList()->AddCircleFilled(ImVec2((windowPos.x + x), (windowPos.y + y)), 7.0f, dotColor);
-
-		float textOffset = 10.f;
-		ImVec2 textPos, iconPos;
-		ImVec2 textSize = ImGui::CalcTextSize(game.players[i - 1].name);
-		
-
-		//Removed names as I don't like the look - Feel free to uncomment to add them back
-		if (game.players[i - 1].teamID != game.localPlayer.teamID) {
-			int weaponID = game.players[i - 1].weaponID;
-			float iconW = (float)icons::iconWidths[weaponID] * icons::scale;
-			float iconH = (float)icons::iconHeights[weaponID] * icons::scale;
-
-			if (angle <= 3.14159265f && angle >= 0) {
-				// below the dot
-				iconPos = ImVec2(windowPos.x + x - (iconW / 2), (windowPos.y + y) + 10.f);
-				//textPos = ImVec2(windowPos.x + x - (textSize.x / 2), (windowPos.y + y) + textOffset + iconH + 2.f);
-			}
-			else {
-				// above the dot
-				//textPos = ImVec2(windowPos.x + x - (textSize.x / 2), (windowPos.y + y) - textOffset - textSize.y - iconH - 2.f);
-				iconPos = ImVec2(windowPos.x + x - (iconW / 2), (windowPos.y + y) - 10.f - iconH);
-			}
-
-			ImGui::GetForegroundDrawList()->AddImage(
-				(ImTextureID)icons::iconTextures[weaponID],
-				iconPos,
-				ImVec2(iconPos.x + iconW, iconPos.y + iconH),
-				ImVec2(0, 0), ImVec2(1, 1),
-				IM_COL32(255, 255, 255, opacity)
-			);
-
-			//ImGui::GetForegroundDrawList()->AddText(textPos, IM_COL32(255, 255, 255, opacity), game.players[i - 1].name);
-		}
-
 	}
 }
+
 
 
 //Helpers - game related

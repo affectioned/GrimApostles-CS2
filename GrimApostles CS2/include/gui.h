@@ -42,8 +42,9 @@ namespace gui {
 	//Game rendering
 	void gameLoop(CGame);
 	void renderMap(ID3D11ShaderResourceView*);
+	void renderIcons(CGame);
+	void renderAimLines(CGame);
 	void renderPlayers(CGame);
-
 	//utility
 	ImU32 setColor(DWORD color, float opacity);
 	void worldToRadar(float& x, float& y, CGame);
