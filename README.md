@@ -3,7 +3,7 @@ GrimApostles CS2 Radar
 This is a simple DMA Radar for Counter-Strike 2 using IMGUI and DirectX11. It is written in C++. This is built using PCILeech to read memory using FPGA hardware (DMA Device). The PCILeech project is linked in the build section. This is a read-only radar - no writes. Check the Updates section for info about updating the radar yourself in case I don't have an up-to-date version in the release section.
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/daaf4ba4-f194-4cdb-a968-9b16c0140280" />
 
-If you have any questions, comments, feedback... feel free to reach out on discord @grimapostles
+**If you have any questions, comments, feedback... feel free to reach out on discord @grimapostles**
 
 
 Building
