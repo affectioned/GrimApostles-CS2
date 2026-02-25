@@ -13,6 +13,9 @@ namespace gui {
 }
 
 namespace maps {
+	//You can change radar size based on your resolution. Set at 1080p right now for 1920x1080
+	float radarSize = 1080;
+
 	float vertigoZBound = 11700;
 	float nukeZBound = -495;
 	std::unordered_map<std::string, ID3D11ShaderResourceView*> mapTextures;
@@ -21,7 +24,7 @@ namespace maps {
 
 namespace icons {
 	int id;
-	float scale = 0.38f;
+	float scale = 0.4f;
 	std::unordered_map<int, ID3D11ShaderResourceView*> iconTextures;
 	std::unordered_map<int, int> iconWidths;
 	std::unordered_map<int, int> iconHeights;
@@ -191,9 +194,9 @@ void gui::gameLoop(CGame game) {
 
 void gui::renderMap(ID3D11ShaderResourceView* texture) {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x / 2 - 1024 / 2), (ImGui::GetIO().DisplaySize.y / 2 - 1024 / 2)));
+	ImGui::SetNextWindowPos(ImVec2((ImGui::GetIO().DisplaySize.x / 2 - maps::radarSize / 2), (ImGui::GetIO().DisplaySize.y / 2 - maps::radarSize / 2)));
 	ImGui::Begin("MAP", nullptr, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
-	ImGui::Image((void*)texture, ImVec2(1024, 1024));
+	ImGui::Image((void*)texture, ImVec2(maps::radarSize, maps::radarSize));
 }
 
 void gui::renderIcons(CGame game) {
@@ -249,10 +252,10 @@ void gui::renderAimLines(CGame game) {
 		angle = angle * 3.14159265f / 180.0f;
 		worldToRadar(x, y, game);
 		opacity = setOpacity(game.localPlayer.position.z, z, game);
-		length = 35.0f;
+		length = 40.0f;
 		//Aim lines
 		ImVec2 endpoint = ImVec2(windowPos.x + x + length * cos(angle) + 1.0f, windowPos.y + y + length * sin(angle) * -1 + 1.0f);
-		ImGui::GetForegroundDrawList()->AddLine(ImVec2((windowPos.x + x), (windowPos.y + y)), endpoint, IM_COL32(1, 1, 1, opacity), 6.5f);
+		ImGui::GetForegroundDrawList()->AddLine(ImVec2((windowPos.x + x), (windowPos.y + y)), endpoint, IM_COL32(0, 0, 0, opacity), 6.5f);
 		ImGui::GetForegroundDrawList()->AddLine(ImVec2((windowPos.x + x), (windowPos.y + y)), endpoint, IM_COL32(255, 255, 255, opacity), 4.0f);
 	}
 }
@@ -281,8 +284,8 @@ void gui::renderPlayers(CGame game) {
 			dotColor = IM_COL32(255, 255, 255, 255);
 		}
 		//Players
-		ImGui::GetForegroundDrawList()->AddCircleFilled(ImVec2((windowPos.x + x), (windowPos.y + y)), 8.25f, IM_COL32(0, 0, 0, 255));
-		ImGui::GetForegroundDrawList()->AddCircleFilled(ImVec2((windowPos.x + x), (windowPos.y + y)), 7.0f, dotColor);
+		ImGui::GetForegroundDrawList()->AddCircleFilled(ImVec2((windowPos.x + x), (windowPos.y + y)), 9.25f, IM_COL32(0, 0, 0, 255));
+		ImGui::GetForegroundDrawList()->AddCircleFilled(ImVec2((windowPos.x + x), (windowPos.y + y)), 8.0f, dotColor);
 	}
 }
 
@@ -296,8 +299,12 @@ void gui::worldToRadar(float& x, float& y, CGame game) {
 	y -= data.yBound;
 	x /= data.scale;
 	y /= data.scale;
+	//radar size conversion
+	x *= maps::radarSize / 1024.f;
+	y *= maps::radarSize / 1024.f;
 	y *= -1;
 }
+
 ImU32 gui::setColor(DWORD color, float opacity) {
 	switch (color) {
 	//Grey
@@ -322,6 +329,7 @@ ImU32 gui::setColor(DWORD color, float opacity) {
 		return IM_COL32(133, 204, 148, opacity);
 	}
 }
+
 float gui::setOpacity(float localZ, float entZ, CGame game) {
 	std::string mapName = game.map;
 	if (mapName == "de_nuke") {

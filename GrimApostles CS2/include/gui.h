@@ -55,10 +55,10 @@ namespace gui {
 }
 
 namespace maps {
+	extern float radarSize;
 	//values for knowing if player is 1st or 2nd floor on multi level maps
 	extern float vertigoZBound;
 	extern float nukeZBound;
-	
 	extern std::unordered_map<std::string, ID3D11ShaderResourceView*> mapTextures;
 	extern std::unordered_map<std::string, mapData> mapBounds;
 }
