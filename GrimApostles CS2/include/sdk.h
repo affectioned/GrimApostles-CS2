@@ -50,11 +50,5 @@ class CGame {
 
 		void getEntityList();
 		void getPlayers();
-		void getName();
-		void getTeam();
-		void getHealth();
-		void getColor();
-		void getAngles();
-		void getPosition();
-		void getWeapons();
+		void getPlayerData();
 };

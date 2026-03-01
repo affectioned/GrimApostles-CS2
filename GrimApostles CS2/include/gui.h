@@ -24,7 +24,15 @@ namespace gui {
 	extern WNDCLASSEXW wc;
 	extern HWND hwnd;
 
-	//Helper Function Declarations
+	// Lifecycle stages (called from main)
+	void CreateAppWindow();
+	bool InitD3D();
+	void ShowAppWindow();
+	void InitImGui();
+	void RunLoop();
+	void Cleanup();
+
+	// D3D helpers (dx11.cpp)
 	bool CreateDeviceD3D(HWND);
 	void CleanupDeviceD3D();
 	void CreateRenderTarget();
@@ -33,25 +41,25 @@ namespace gui {
 	ID3D11ShaderResourceView* LoadImageTexture(ID3D11Device* device, const wchar_t* filename, int* outWidth, int* outHeight);
 	LRESULT WINAPI WndProc(HWND, UINT, WPARAM, LPARAM);
 
-	//Rendering Functions
-	void initializeGUI();
-	void Render();
+	// UI buttons (gui.cpp)
 	void ConnectButton();
 	void ExitButton();
 
-	//Game rendering
+	// Game rendering (render.cpp)
 	void gameLoop(CGame);
 	void renderMap(ID3D11ShaderResourceView*);
 	void renderIcons(CGame);
 	void renderAimLines(CGame);
 	void renderPlayers(CGame);
-	//utility
-	ImU32 setColor(DWORD color, float opacity);
-	void worldToRadar(float& x, float& y, CGame);
+
+	// Resource loading (resources.cpp)
 	void loadMapBounds();
 	void loadTextures();
+
+	// Utilities (render.cpp)
+	ImU32 setColor(DWORD color, float opacity);
+	void worldToRadar(float& x, float& y, CGame);
 	float setOpacity(float, float, CGame);
-	ID3D11ShaderResourceView* fetchMap(std::string);
 }
 
 namespace maps {
