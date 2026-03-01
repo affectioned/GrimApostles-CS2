@@ -1,4 +1,6 @@
+#include "pch.h"
 #include "DMADevice.h"
+
 using namespace std;
 
 bool DMADevice::bConnected = false;

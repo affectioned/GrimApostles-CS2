@@ -1,3 +1,4 @@
+#include "pch.h"
 #include "vec.h"
 
 Vector3::Vector3()
