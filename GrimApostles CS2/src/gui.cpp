@@ -173,11 +173,11 @@ void gui::FpsOverlay() {
 	ImGui::SetNextWindowPos(ImVec2(ImGui::GetIO().DisplaySize.x - 185, 125));
 	ImGui::SetNextWindowBgAlpha(0.0f);
 	ImGui::Begin("FPS", nullptr,
-		ImGuiWindowFlags_NoTitleBar |
-		ImGuiWindowFlags_NoResize |
-		ImGuiWindowFlags_NoMove |
-		ImGuiWindowFlags_NoScrollbar |
-		ImGuiWindowFlags_NoInputs |
+		ImGuiWindowFlags_NoTitleBar      |
+		ImGuiWindowFlags_NoResize        |
+		ImGuiWindowFlags_NoMove          |
+		ImGuiWindowFlags_NoScrollbar     |
+		ImGuiWindowFlags_NoInputs        |
 		ImGuiWindowFlags_AlwaysAutoResize
 	);
 	ImGui::Text("%.0f FPS", ImGui::GetIO().Framerate);

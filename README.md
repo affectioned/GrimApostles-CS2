@@ -1,31 +1,43 @@
 GrimApostles CS2 Radar
 ---
-This is a simple DMA Radar for Counter-Strike 2 using IMGUI and DirectX11. It is written in C++. This is built using PCILeech to read memory using FPGA hardware (DMA Device). The PCILeech project is linked in the build section. This is a read-only radar - no writes. Check the Updates section for info about updating the radar yourself in case I don't have an up-to-date version in the release section.
+A DMA-based radar for Counter-Strike 2 built with ImGui and DirectX 11, written in C++. Uses PCILeech/MemProcFS to read game memory via FPGA hardware (DMA device). **Read-only — no writes to game memory.**
+
 <img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/daaf4ba4-f194-4cdb-a968-9b16c0140280" />
 
-**If you have any questions, comments, feedback... feel free to reach out on discord @grimapostles**
+**If you have any questions, comments, or feedback, feel free to reach out on Discord @grimapostles**
 
+---
+
+> **Educational Disclaimer**
+>
+> This project is provided for **educational and research purposes only**. It demonstrates techniques such as DMA memory reading via FPGA hardware, DirectX 11 rendering with ImGui, and runtime offset resolution from public dumper output.
+>
+> The authors do not endorse or encourage use of this software in any online multiplayer environment. Usage in online games may violate the game's Terms of Service and could result in account penalties. **You are solely responsible for how you use this software.**
+>
+> No game memory is written. All data is read-only.
+
+---
 
 Building
 ---
-To build this project, clone this repository and open the SLN file using Visual Studio. I am using the Visual Studio 2022 (v143) version. Make sure to set the output configuration to Release(x64) and build the project. The build and binary directories will be created. You will find your .exe in the "bin/release" directory.
+Clone the repository and open the `.sln` file in **Visual Studio 2022 (v143)**. Set the configuration to **Release x64** and build. The output `.exe` will be in `bin/Release/`.
 
-Download the pcileech dependencies and place them along side your exe. You need: **vmm.dll, leechcore.dll, FTD3XX.dll** 
+**PCILeech runtime dependencies** — download from the [PCILeech releases page](https://github.com/ufrisk/pcileech/releases) (Windows) and place alongside the `.exe`:
+- `vmm.dll`
+- `leechcore.dll`
+- `FTD3XX.dll`
 
-Found here [https://github.com/ufrisk/pcileech](https://github.com/ufrisk/pcileech/releases) (Windows Download)
+**Textures** — place the `textures/` folder (maps and weapon icons) alongside the `.exe`. You can find the source assets in the [assets](https://github.com/GrimApostles/GrimApostles-CS2/tree/main/GrimApostles%20CS2/assets) directory of this repo.
 
-Additonally, you can find the necessary .dll and texture files in the [assets](https://github.com/GrimApostles/GrimApostles-CS2/tree/ec08c49b5c7ec1537d7b06b16758a09a17d74ebb/GrimApostles%20CS2/assets) directory - place these files alongside your compiled program
+Example directory layout:
 
-Here's an example of what it should look like
 <img width="1059" height="292" alt="Screenshot 2026-02-25 005002" src="https://github.com/user-attachments/assets/3bc84ec6-995e-4dce-be40-df87005dc85b" />
-
-
-If you want to build using something else you will have to handle linking the dependencies.
 
 Updating
 ---
-This project does not yet include auto updates. Use the a2x dumper to get new offsets for each update.
+Offsets are fetched automatically at startup from the a2x CS2 dumper output:
 
-https://github.com/a2x/cs2-dumper
+- [`offsets.hpp`](https://github.com/a2x/cs2-dumper/blob/main/output/offsets.hpp) — module-level pointer offsets (`dwEntityList`, `dwLocalPlayerController`, etc.)
+- [`client_dll.hpp`](https://github.com/a2x/cs2-dumper/blob/main/output/client_dll.hpp) — class member offsets (`m_iHealth`, `m_angEyeAngles`, etc.)
 
-You will find [**offsets.hpp**](https://github.com/a2x/cs2-dumper/blob/main/output/offsets.hpp) and [**client_dll.hpp**](https://github.com/a2x/cs2-dumper/blob/main/output/client_dll.hpp) in the output folder. You will need to copy offsets in the **offsets::client_dll** namespace every update. The extra (Player)values you will find in the radar offset file are updated rarely and only need to be changed if an update breaks any features. You can search for these offsets in the formentioned **client_dll.hpp** file using CTRL-F
+If the fetch fails (no internet connection or the dumper is temporarily unavailable), the radar falls back to the last known good values hardcoded in `src/offsets.cpp`. To update those defaults manually, replace the values in that file with the current ones from the dumper.
