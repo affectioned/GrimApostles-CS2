@@ -64,26 +64,12 @@ bool updater::fetchOffsets() {
 		if (auto v = getOffset(content, name)) { target = v; updated++; }
 	};
 
-	assign(client_dll::dwCSGOInput,                           "dwCSGOInput");
-	assign(client_dll::dwEntityList,                          "dwEntityList");
-	assign(client_dll::dwGameEntitySystem,                    "dwGameEntitySystem");
-	assign(client_dll::dwGameEntitySystem_highestEntityIndex, "dwGameEntitySystem_highestEntityIndex");
-	assign(client_dll::dwGameRules,                           "dwGameRules");
-	assign(client_dll::dwGlobalVars,                          "dwGlobalVars");
-	assign(client_dll::dwGlowManager,                         "dwGlowManager");
-	assign(client_dll::dwLocalPlayerController,               "dwLocalPlayerController");
-	assign(client_dll::dwLocalPlayerPawn,                     "dwLocalPlayerPawn");
-	assign(client_dll::dwPlantedC4,                           "dwPlantedC4");
-	assign(client_dll::dwPrediction,                          "dwPrediction");
-	assign(client_dll::dwSensitivity,                         "dwSensitivity");
-	assign(client_dll::dwSensitivity_sensitivity,             "dwSensitivity_sensitivity");
-	assign(client_dll::dwViewAngles,                          "dwViewAngles");
-	assign(client_dll::dwViewMatrix,                          "dwViewMatrix");
-	assign(client_dll::dwViewRender,                          "dwViewRender");
-	assign(client_dll::dwWeaponC4,                            "dwWeaponC4");
-	assign(matchmaking_dll::dwGameTypes,                      "dwGameTypes");
+	assign(client_dll::dwEntityList,            "dwEntityList");
+	assign(client_dll::dwLocalPlayerController, "dwLocalPlayerController");
+	assign(client_dll::dwLocalPlayerPawn,       "dwLocalPlayerPawn");
+	assign(matchmaking_dll::dwGameTypes,        "dwGameTypes");
 
-	std::cout << "[Updater]: " << updated << "/18 dw* offsets updated." << std::endl;
+	std::cout << "[Updater]: " << updated << "/4 dw* offsets updated." << std::endl;
 	return updated > 0;
 }
 

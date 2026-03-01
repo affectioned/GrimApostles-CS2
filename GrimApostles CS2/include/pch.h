@@ -10,9 +10,7 @@
 // STL
 #include <iostream>
 #include <string>
-#include <sstream>
 #include <cstdio>
 #include <cstdint>
 #include <conio.h>
-#include <thread>
 #include <unordered_map>

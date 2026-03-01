@@ -24,7 +24,6 @@ namespace maps {
 }
 
 namespace icons {
-	int id;
 	float scale = 0.4f;
 	std::unordered_map<int, ID3D11ShaderResourceView*> iconTextures;
 	std::unordered_map<int, int> iconWidths;

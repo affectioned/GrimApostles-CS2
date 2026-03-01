@@ -7,8 +7,6 @@
 #include <cstdio>
 #include <conio.h>
 #include <cstdint>
-#include <iostream>
-#include <thread>
 #pragma comment(lib,"leechcore")
 #pragma comment(lib,"vmm")
 
@@ -21,8 +19,6 @@ namespace DMADevice
 	extern bool bConnected;
 	extern DWORD dwAttachedProcessId;
 	extern uint64_t moduleBase;
-	extern uint64_t PEB;
-	extern uint64_t qwID, qwVersionMajor, qwVersionMinor;
 	extern VMM_HANDLE hVMM;
 	extern VMMDLL_SCATTER_HANDLE hScatter;
 
@@ -56,22 +52,6 @@ namespace DMADevice
 			return lpPtr;
 		}
 		return 0;
-	}
-
-	template<typename U, typename P>BOOL MemWrite(U lpAddress, P lpInput, size_t uiSize)
-	{
-		if (!dwAttachedProcessId || !bConnected || !lpAddress || !hVMM) {
-			return FALSE;
-		}
-		return VMMDLL_MemWrite(hVMM, dwAttachedProcessId, (ULONG64)lpAddress, (PBYTE)lpInput, uiSize);
-	}
-
-	template<typename U, typename P>BOOL MemWritePtr(U lpAddress, P lpInput)
-	{
-		if (!dwAttachedProcessId || !bConnected || !lpAddress || !hVMM) {
-			return FALSE;
-		}
-		return VMMDLL_MemWrite(hVMM, dwAttachedProcessId, (ULONG64)lpAddress, (PBYTE)&lpInput, sizeof(P));
 	}
 
 	// Add a entry to the scatter handle for a address to be read and specify the output buffer for the data to be stored

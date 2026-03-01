@@ -7,7 +7,6 @@ bool DMADevice::bConnected = false;
 DWORD DMADevice::dwAttachedProcessId = NULL;
 VMM_HANDLE DMADevice::hVMM = NULL;
 uint64_t DMADevice::moduleBase = NULL;
-uint64_t DMADevice::PEB = NULL;
 VMMDLL_SCATTER_HANDLE DMADevice::hScatter = NULL;
 
 void DMADevice::ShowKeyPress() {
@@ -46,7 +45,7 @@ bool DMADevice::Connect() {
 		VMMDLL_ConfigGet(hVMM, LC_OPT_FPGA_VERSION_MINOR, &qwVersionMinor);
 
 	if (result) {
-		
+
 		//printf("[DMA]: DMA configuration found\n");
 		//printf("         ID = %lli\n", qwID);
 		//printf("         VERSION = %lli.%lli\n", qwVersionMajor, qwVersionMinor);
@@ -84,7 +83,7 @@ bool DMADevice::Connect() {
 	//Set our connection status and return
 	bConnected = true;
 	return bReturnStatus;
-}	
+}
 
 void DMADevice::Disconnect() {
 	bConnected = false;
@@ -95,7 +94,6 @@ void DMADevice::Disconnect() {
 	hScatter = NULL;
 	dwAttachedProcessId = NULL;
 	moduleBase = NULL;
-	PEB = NULL;
 }
 
 bool DMADevice::AttachToProcessId() {
@@ -107,7 +105,7 @@ bool DMADevice::AttachToProcessId() {
 	if (!(VMMDLL_PidGetFromName(hVMM, PROCESS, &dwAttachedProcessId))) {
 		cout << "[DMA]: Failed to find PID\n";
 		return false;
-	} 
+	}
 	VMMDLL_PROCESS_INFORMATION ProcessInformation;
 	SIZE_T cbProcessInformation = sizeof(VMMDLL_PROCESS_INFORMATION);
 	ZeroMemory(&ProcessInformation, sizeof(VMMDLL_PROCESS_INFORMATION));
@@ -115,8 +113,6 @@ bool DMADevice::AttachToProcessId() {
 	ProcessInformation.wVersion = VMMDLL_PROCESS_INFORMATION_VERSION;
 	result = VMMDLL_ProcessGetInformation(hVMM, dwAttachedProcessId, &ProcessInformation, &cbProcessInformation);
 	if (result) {
-		//printf("SUCCESS: VMMDLL_ProcessGetInformation\n");
-		PEB = ProcessInformation.win.vaPEB;
 		return true;
 	}
 	else {
