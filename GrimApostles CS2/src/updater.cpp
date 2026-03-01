@@ -31,14 +31,18 @@ static std::string fetchURL(const wchar_t* url) {
 	return result;
 }
 
-// ─── Regex helpers ────────────────────────────────────────────────────────────
+// ─── Parsing helpers ──────────────────────────────────────────────────────────
+// Single pass over the content — builds a name→value map in O(n).
 
-static std::ptrdiff_t getOffset(const std::string& content, const std::string& name) {
-	std::regex rx(name + R"(\s*=\s*0x([0-9A-Fa-f]+))");
-	std::smatch m;
-	if (std::regex_search(content, m, rx))
-		return static_cast<std::ptrdiff_t>(std::stoull(m[1].str(), nullptr, 16));
-	return 0;
+using OffsetMap = std::unordered_map<std::string, std::ptrdiff_t>;
+
+static OffsetMap parseOffsets(const std::string& content) {
+	static const std::regex rx(R"((\w+)\s*=\s*0x([0-9A-Fa-f]+))");
+	OffsetMap map;
+	for (auto it = std::sregex_iterator(content.begin(), content.end(), rx);
+	     it != std::sregex_iterator(); ++it)
+		map[(*it)[1].str()] = static_cast<std::ptrdiff_t>(std::stoull((*it)[2].str(), nullptr, 16));
+	return map;
 }
 
 static std::string getClassBlock(const std::string& content, const std::string& ns) {
@@ -59,9 +63,10 @@ bool updater::fetchOffsets() {
 		return false;
 	}
 
+	OffsetMap off = parseOffsets(content);
 	int updated = 0;
 	auto assign = [&](std::ptrdiff_t& target, const std::string& name) {
-		if (auto v = getOffset(content, name)) { target = v; updated++; }
+		if (auto it = off.find(name); it != off.end()) { target = it->second; updated++; }
 	};
 
 	assign(client_dll::dwEntityList,            "dwEntityList");
@@ -85,17 +90,17 @@ bool updater::fetchClassOffsets() {
 	}
 
 	int updated = 0;
-	auto assign = [&](std::ptrdiff_t& target, const std::string& block, const std::string& name) {
-		if (auto v = getOffset(block, name)) { target = v; updated++; }
+	auto assign = [&](std::ptrdiff_t& target, const OffsetMap& off, const std::string& name) {
+		if (auto it = off.find(name); it != off.end()) { target = it->second; updated++; }
 	};
 
-	std::string baseEntity     = getClassBlock(content, "C_BaseEntity");
-	std::string basePlayerPawn = getClassBlock(content, "C_BasePlayerPawn");
-	std::string playerCtrl     = getClassBlock(content, "CCSPlayerController");
-	std::string csPlayerPawn   = getClassBlock(content, "C_CSPlayerPawn");
-	std::string econEntity     = getClassBlock(content, "C_EconEntity");
-	std::string attrContainer  = getClassBlock(content, "C_AttributeContainer");
-	std::string econItemView   = getClassBlock(content, "C_EconItemView");
+	OffsetMap baseEntity     = parseOffsets(getClassBlock(content, "C_BaseEntity"));
+	OffsetMap basePlayerPawn = parseOffsets(getClassBlock(content, "C_BasePlayerPawn"));
+	OffsetMap playerCtrl     = parseOffsets(getClassBlock(content, "CCSPlayerController"));
+	OffsetMap csPlayerPawn   = parseOffsets(getClassBlock(content, "C_CSPlayerPawn"));
+	OffsetMap econEntity     = parseOffsets(getClassBlock(content, "C_EconEntity"));
+	OffsetMap attrContainer  = parseOffsets(getClassBlock(content, "C_AttributeContainer"));
+	OffsetMap econItemView   = parseOffsets(getClassBlock(content, "C_EconItemView"));
 
 	assign(client_dll::C_BaseEntity::m_iTeamNum,                   baseEntity,     "m_iTeamNum");
 	assign(client_dll::C_BaseEntity::m_iHealth,                    baseEntity,     "m_iHealth");
