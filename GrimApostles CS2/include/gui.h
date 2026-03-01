@@ -44,6 +44,7 @@ namespace gui {
 	// UI buttons (gui.cpp)
 	void ConnectButton();
 	void ExitButton();
+	void FpsOverlay();
 
 	// Game rendering (render.cpp)
 	void gameLoop(CGame);
