@@ -18,10 +18,12 @@ void gui::gameLoop(CGame game) {
 
 void gui::renderMap(ID3D11ShaderResourceView* texture) {
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::SetNextWindowPos(ImVec2(
 		(ImGui::GetIO().DisplaySize.x / 2 - maps::radarSize / 2),
 		(ImGui::GetIO().DisplaySize.y / 2 - maps::radarSize / 2)
 	));
+	ImGui::SetNextWindowSize(ImVec2(maps::radarSize, maps::radarSize));
 	ImGui::Begin("MAP", nullptr,
 		ImGuiWindowFlags_NoBackground |
 		ImGuiWindowFlags_NoScrollbar  |
@@ -29,6 +31,7 @@ void gui::renderMap(ID3D11ShaderResourceView* texture) {
 		ImGuiWindowFlags_NoResize
 	);
 	ImGui::Image((void*)texture, ImVec2(maps::radarSize, maps::radarSize));
+	ImGui::PopStyleVar(2);
 }
 
 // Single pass over all players: aim line → weapon icon (enemies only) → dot
@@ -58,7 +61,7 @@ void gui::renderPlayers(CGame game) {
 
 		// Weapon icon — enemies only
 		if (p.teamID != game.localPlayer.teamID) {
-			int   weaponID = p.weaponID;
+			int   weaponID = p.activeWeaponID;
 			float iconW    = (float)icons::iconWidths[weaponID]  * icons::scale;
 			float iconH    = (float)icons::iconHeights[weaponID] * icons::scale;
 			ImVec2 iconPos = (angle >= 0 && angle <= PI)

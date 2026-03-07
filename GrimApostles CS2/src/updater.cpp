@@ -94,26 +94,36 @@ bool updater::fetchClassOffsets() {
 		if (auto it = off.find(name); it != off.end()) { target = it->second; updated++; }
 	};
 
-	OffsetMap baseEntity     = parseOffsets(getClassBlock(content, "C_BaseEntity"));
-	OffsetMap basePlayerPawn = parseOffsets(getClassBlock(content, "C_BasePlayerPawn"));
-	OffsetMap playerCtrl     = parseOffsets(getClassBlock(content, "CCSPlayerController"));
-	OffsetMap csPlayerPawn   = parseOffsets(getClassBlock(content, "C_CSPlayerPawn"));
-	OffsetMap econEntity     = parseOffsets(getClassBlock(content, "C_EconEntity"));
-	OffsetMap attrContainer  = parseOffsets(getClassBlock(content, "C_AttributeContainer"));
-	OffsetMap econItemView   = parseOffsets(getClassBlock(content, "C_EconItemView"));
+	OffsetMap baseEntity				= parseOffsets(getClassBlock(content, "C_BaseEntity"));
+	OffsetMap basePlayerPawn			= parseOffsets(getClassBlock(content, "C_BasePlayerPawn"));
+	OffsetMap playerCtrl				= parseOffsets(getClassBlock(content, "CCSPlayerController"));
+	OffsetMap csPlayerPawn				= parseOffsets(getClassBlock(content, "C_CSPlayerPawn"));
+	OffsetMap econEntity				= parseOffsets(getClassBlock(content, "C_EconEntity"));
+	OffsetMap attrContainer				= parseOffsets(getClassBlock(content, "C_AttributeContainer"));
+	OffsetMap econItemView				= parseOffsets(getClassBlock(content, "C_EconItemView"));
+	OffsetMap CPlayer_WeaponServices	= parseOffsets(getClassBlock(content, "CPlayer_WeaponServices"));
 
-	assign(client_dll::C_BaseEntity::m_iTeamNum,                   baseEntity,     "m_iTeamNum");
-	assign(client_dll::C_BaseEntity::m_iHealth,                    baseEntity,     "m_iHealth");
-	assign(client_dll::C_BasePlayerPawn::m_vOldOrigin,             basePlayerPawn, "m_vOldOrigin");
+	assign(client_dll::C_BaseEntity::m_iTeamNum, baseEntity,     "m_iTeamNum");
+	assign(client_dll::C_BaseEntity::m_iHealth, baseEntity,     "m_iHealth");
+
+	assign(client_dll::C_BasePlayerPawn::m_vOldOrigin, basePlayerPawn, "m_vOldOrigin");
+	assign(client_dll::C_BasePlayerPawn::m_pWeaponServices, basePlayerPawn, "m_pWeaponServices");
+
 	assign(client_dll::CCSPlayerController::m_hPlayerPawn,         playerCtrl,     "m_hPlayerPawn");
 	assign(client_dll::CCSPlayerController::m_sSanitizedPlayerName,playerCtrl,     "m_sSanitizedPlayerName");
 	assign(client_dll::CCSPlayerController::m_iCompTeammateColor,  playerCtrl,     "m_iCompTeammateColor");
+
 	assign(client_dll::C_CSPlayerPawn::m_angEyeAngles,             csPlayerPawn,   "m_angEyeAngles");
 	assign(client_dll::C_CSPlayerPawn::m_pClippingWeapon,          csPlayerPawn,   "m_pClippingWeapon");
+
 	assign(client_dll::C_EconEntity::m_AttributeManager,           econEntity,     "m_AttributeManager");
+
 	assign(client_dll::C_AttributeContainer::m_Item,               attrContainer,  "m_Item");
+
 	assign(client_dll::C_EconItemView::m_iItemDefinitionIndex,     econItemView,   "m_iItemDefinitionIndex");
 
-	std::cout << "[Updater]: " << updated << "/11 class offsets updated." << std::endl;
+	assign(client_dll::CPlayer_WeaponServices::m_hMyWeapons, CPlayer_WeaponServices, "m_hMyWeapons");
+
+	std::cout << "[Updater]: " << updated << "/13 class offsets updated." << std::endl;
 	return updated > 0;
 }

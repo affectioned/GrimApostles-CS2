@@ -4,7 +4,6 @@
 #include "vmm/leechcore.h"
 #include <iostream>
 #include <string.h>
-#include <cstdio>
 #include <conio.h>
 #include <cstdint>
 #pragma comment(lib,"leechcore")

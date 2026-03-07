@@ -36,15 +36,18 @@ void gui::CreateAppWindow() {
 	wc = { sizeof(wc), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"GrimApostles", nullptr };
 	::RegisterClassExW(&wc);
 	hwnd = ::CreateWindowExW(WS_EX_APPWINDOW, wc.lpszClassName, L"GrimApostles CS2", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, wc.hInstance, nullptr);
+	std::cout << "[GUI]: Window created (HWND: " << hwnd << ")\n";
 }
 
 // Stage 2: Initialize Direct3D device and swap chain
 bool gui::InitD3D() {
 	if (!CreateDeviceD3D(hwnd)) {
+		std::cout << "[GUI]: Direct3D initialization failed\n";
 		CleanupDeviceD3D();
 		::UnregisterClassW(wc.lpszClassName, wc.hInstance);
 		return false;
 	}
+	std::cout << "[GUI]: Direct3D initialized\n";
 	return true;
 }
 
@@ -52,6 +55,7 @@ bool gui::InitD3D() {
 void gui::ShowAppWindow() {
 	::ShowWindow(hwnd, SW_MAXIMIZE);
 	::UpdateWindow(hwnd);
+	std::cout << "[GUI]: Window shown and maximized\n";
 }
 
 // Stage 4: Create ImGui context and bind platform/renderer backends
@@ -64,10 +68,12 @@ void gui::InitImGui() {
 
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
+	std::cout << "[GUI]: ImGui initialized (version " << IMGUI_VERSION << ")\n";
 }
 
 // Stage 5: Main render loop
 void gui::RunLoop() {
+	std::cout << "[GUI]: Render loop started\n";
 	ImVec4 clear_color = ImVec4(0.0f, 0.0f, 0.0f, 1.f);
 	CGame game;
 
@@ -120,10 +126,12 @@ void gui::RunLoop() {
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 		g_pSwapChain->Present(1, 0); // vsync
 	}
+	std::cout << "[GUI]: Render loop exited\n";
 }
 
 // Stage 6: Shut down ImGui, D3D, and the window
 void gui::Cleanup() {
+	std::cout << "[GUI]: Cleaning up ImGui, D3D, and window\n";
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
@@ -131,6 +139,7 @@ void gui::Cleanup() {
 	CleanupDeviceD3D();
 	::DestroyWindow(hwnd);
 	::UnregisterClassW(wc.lpszClassName, wc.hInstance);
+	std::cout << "[GUI]: Cleanup complete\n";
 	DMADevice::ShowKeyPress();
 }
 
@@ -150,7 +159,6 @@ void gui::ConnectButton() {
 			std::cout << "[DMA]: CLIENT.DLL BASE: 0x" << std::hex << DMADevice::moduleBase << std::endl;
 		}
 		else {
-			std::cout << "[DEBUG OUTPUT]: " << std::endl;
 			DMADevice::Disconnect();
 		}
 	}

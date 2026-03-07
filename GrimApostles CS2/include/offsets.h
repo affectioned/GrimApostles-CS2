@@ -28,6 +28,7 @@ namespace client_dll {
 
 	namespace C_BasePlayerPawn {
 		extern std::ptrdiff_t m_vOldOrigin;  // Vector3
+		extern std::ptrdiff_t m_pWeaponServices; // CPlayer_WeaponServices*
 	}
 
 	namespace CCSPlayerController {
@@ -51,5 +52,9 @@ namespace client_dll {
 
 	namespace C_EconItemView {
 		extern std::ptrdiff_t m_iItemDefinitionIndex;  // uint16_t
+	}
+
+	namespace CPlayer_WeaponServices {
+		extern std::ptrdiff_t m_hMyWeapons; // C_NetworkUtlVectorBase<CHandle<C_BasePlayerWeapon>>
 	}
 }

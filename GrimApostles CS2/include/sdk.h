@@ -16,6 +16,14 @@ public:
 	mapData() : xBound(0.0f), yBound(0.0f), scale(0.0f) {}
 };
 
+class CWeapon {
+public:
+	uint32_t weaponHandle;
+	uint64_t weaponEntry;
+	uint64_t weaponController;
+	uint16_t weaponID;
+};
+
 class CPlayer {
 	public:
 		uint64_t controller;
@@ -29,8 +37,14 @@ class CPlayer {
 		DWORD color;
 		Vector2 eyeAngles;
 		Vector3 position;
-		uint64_t weaponPtr;
-		uint16_t weaponID;
+		//Active Weapon
+		uint64_t activeWeapon;
+		uint16_t activeWeaponID;
+		//WeaponServices
+		uint64_t weaponServices;
+		int32_t weaponCount;
+		uint64_t weaponData;
+		CWeapon weapons[9];
 };
 
 class CGame {
@@ -51,4 +65,6 @@ class CGame {
 		void getEntityList();
 		void getPlayers();
 		void getPlayerData();
+
+		void getWeapons();
 };

@@ -45,14 +45,12 @@ bool DMADevice::Connect() {
 		VMMDLL_ConfigGet(hVMM, LC_OPT_FPGA_VERSION_MINOR, &qwVersionMinor);
 
 	if (result) {
-
-		//printf("[DMA]: DMA configuration found\n");
-		//printf("         ID = %lli\n", qwID);
-		//printf("         VERSION = %lli.%lli\n", qwVersionMajor, qwVersionMinor);
-
+		cout << "[DMA]: DMA configuration found\n";
+		cout << "         ID = " << qwID << "\n";
+		cout << "         VERSION = " << qwVersionMajor << "." << qwVersionMinor << "\n";
 	}
 	else {
-		printf("[DMA]: Failed to find DMA Config\n");
+		cout << "[DMA]: Failed to find DMA Config\n";
 		bConnected = false;
 		VMMDLL_Close(hVMM);
 		VMMDLL_Scatter_CloseHandle(hScatter);
@@ -75,7 +73,7 @@ bool DMADevice::Connect() {
 		if (leechCoreHandle) {
 			// enable auto-clear of status register [master abort].
 			LcCommand(leechCoreHandle, LC_CMD_FPGA_CFGREGPCIE_MARKWR | 0x002, 4, bytes, NULL, NULL);
-			//printf("[DMA]: AUTO ABORT CLEARING ON\n");
+			cout << "[DMA]: Auto abort clearing on\n";
 			// close leechcore handle.
 			LcClose(leechCoreHandle);
 		}
@@ -86,6 +84,7 @@ bool DMADevice::Connect() {
 }
 
 void DMADevice::Disconnect() {
+	cout << "[DMA]: Disconnecting...\n";
 	bConnected = false;
 	//close our VMM handle
 	VMMDLL_Close(hVMM);
@@ -94,6 +93,7 @@ void DMADevice::Disconnect() {
 	hScatter = NULL;
 	dwAttachedProcessId = NULL;
 	moduleBase = NULL;
+	cout << "[DMA]: Disconnected\n";
 }
 
 bool DMADevice::AttachToProcessId() {
@@ -113,10 +113,11 @@ bool DMADevice::AttachToProcessId() {
 	ProcessInformation.wVersion = VMMDLL_PROCESS_INFORMATION_VERSION;
 	result = VMMDLL_ProcessGetInformation(hVMM, dwAttachedProcessId, &ProcessInformation, &cbProcessInformation);
 	if (result) {
+		cout << "[DMA]: Attached to process " << PROCESS << " (PID: " << dwAttachedProcessId << ")\n";
 		return true;
 	}
 	else {
-		printf("[DMA]: Failed to get process information\n");
+		cout << "[DMA]: Failed to get process information\n";
 		return false;
 	}
 }
