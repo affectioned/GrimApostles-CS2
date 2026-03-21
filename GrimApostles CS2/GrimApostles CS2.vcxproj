@@ -205,6 +205,7 @@
     <ClCompile Include="src\render.cpp" />
     <ClCompile Include="src\resources.cpp" />
     <ClCompile Include="src\sdk.cpp" />
+    <ClCompile Include="src\SigScan.cpp" />
     <ClCompile Include="src\updater.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -222,6 +223,7 @@
     <ClInclude Include="include\offsets.h" />
     <ClInclude Include="include\pch.h" />
     <ClInclude Include="include\sdk.h" />
+    <ClInclude Include="include\SigScan.h" />
     <ClInclude Include="include\updater.h" />
     <ClInclude Include="include\vec.h" />
     <ClInclude Include="include\vmm\leechcore.h" />

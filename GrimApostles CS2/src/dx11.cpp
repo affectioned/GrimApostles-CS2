@@ -1,5 +1,9 @@
 #include "pch.h"
 #include "gui.h"
+#include <wininet.h>
+#include <wincodec.h>
+#pragma comment(lib, "wininet")
+#pragma comment(lib, "windowscodecs")
 
 bool gui::CreateDeviceD3D(HWND hWnd)
 {

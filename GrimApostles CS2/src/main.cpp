@@ -23,9 +23,9 @@ int main() {
 
 	std::cout << "[Main]: GrimApostles CS2 starting\n";
 
-	// Stage 1: Fetch latest offsets from remote (falls back to hardcoded defaults on failure)
-	std::cout << "[Main]: Stage 1 - Fetching offsets\n";
-	updater::fetchOffsets();       // offsets.hpp     → client_dll::dw* + matchmaking_dll::dwGameTypes
+	// Stage 1: Fetch latest class offsets from remote (falls back to hardcoded defaults on failure)
+	// dw* offsets are resolved locally via signature scan after DMA connects (gui::ConnectButton)
+	std::cout << "[Main]: Stage 1 - Fetching class offsets\n";
 	updater::fetchClassOffsets();  // client_dll.hpp  → client_dll::ClassName::m_*
 
 	// Stage 2: Create the Win32 window

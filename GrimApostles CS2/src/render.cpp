@@ -37,7 +37,7 @@ void gui::renderMap(ID3D11ShaderResourceView* texture) {
 	ImGui::PopStyleVar(2);
 }
 
-// Single pass over all players: aim line → weapon icon (enemies only) → dot
+// Single pass over all players: aim line -> weapon icon (enemies only) -> dot -> health bar
 void gui::renderPlayers(const CGame& game) {
 	ImVec2      windowPos  = ImGui::GetWindowPos();
 	const float aimLength  = 40.0f;
@@ -62,7 +62,7 @@ void gui::renderPlayers(const CGame& game) {
 		ImGui::GetForegroundDrawList()->AddLine(pos, endpoint, IM_COL32(0,   0,   0,   (int)opacity), 6.5f);
 		ImGui::GetForegroundDrawList()->AddLine(pos, endpoint, IM_COL32(255, 255, 255, (int)opacity), 4.0f);
 
-		// Weapon icon — enemies only
+		// Weapon icon -- enemies only
 		if (p.teamID != game.localPlayer.teamID) {
 			int weaponID = p.activeWeaponID;
 			auto texIt = icons::iconTextures.find(weaponID);
@@ -70,8 +70,8 @@ void gui::renderPlayers(const CGame& game) {
 				float  iconW   = (float)icons::iconWidths[weaponID]  * icons::scale;
 				float  iconH   = (float)icons::iconHeights[weaponID] * icons::scale;
 				ImVec2 iconPos = (angle >= 0 && angle <= PI)
-					? ImVec2(pos.x - iconW / 2, pos.y + 10.f)
-					: ImVec2(pos.x - iconW / 2, pos.y - 10.f - iconH);
+					? ImVec2(pos.x - iconW / 2, pos.y + 20.f)
+					: ImVec2(pos.x - iconW / 2, pos.y - 20.f - iconH);
 				ImGui::GetForegroundDrawList()->AddImage(
 					(ImTextureID)texIt->second,
 					iconPos, ImVec2(iconPos.x + iconW, iconPos.y + iconH),
@@ -81,7 +81,7 @@ void gui::renderPlayers(const CGame& game) {
 			}
 		}
 
-		// Player dot — local player white, teammates colored, enemies red
+		// Player dot -- local player white, teammates colored, enemies red
 		ImU32 dotColor;
 		if      (p.controller == game.localPlayer.controller) dotColor = IM_COL32(255, 255, 255, 255);
 		else if (p.teamID     == game.localPlayer.teamID)     dotColor = setColor(p.color, opacity);
@@ -89,6 +89,19 @@ void gui::renderPlayers(const CGame& game) {
 
 		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, 9.25f, IM_COL32(0, 0, 0, 255));
 		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, 8.0f,  dotColor);
+
+		// Health bar -- enemies only, vertical bar on the left side of the dot
+		if (p.teamID != game.localPlayer.teamID) {
+			constexpr float barW = 3.0f, barH = 18.0f, barX = 14.0f;
+			float filled = (float)p.health / 100.0f;
+			float r = 255.0f * (1.0f - filled);
+			float g = 255.0f * filled;
+			ImVec2 barTL = ImVec2(pos.x - barX - barW, pos.y - barH / 2);
+			ImVec2 barBR = ImVec2(pos.x - barX,        pos.y + barH / 2);
+			float  fillY = barBR.y - barH * filled;
+			ImGui::GetForegroundDrawList()->AddRectFilled(barTL, barBR, IM_COL32(0, 0, 0, (int)opacity));
+			ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(barTL.x, fillY), barBR, IM_COL32((int)r, (int)g, 0, (int)opacity));
+		}
 	}
 }
 
