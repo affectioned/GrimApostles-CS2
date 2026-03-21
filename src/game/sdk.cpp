@@ -108,18 +108,13 @@ void CGame::getPlayers() {
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);
 
-	int newCount = 0;
-	for (int i = 0; i < 64; i++)
-		if (players[i].controller) newCount++;
-	if (newCount > 0)
-		playerCount = newCount;
 }
 
 
 // ─── Player data (two consolidated scatter passes) ────────────────────────────
 
 void CGame::getPlayerData() {
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		if (!players[i].controller || !players[i].pawn) continue;
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName, &players[i].nameAddr,  sizeof(uint64_t));
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::C_BaseEntity::m_iTeamNum,                    &players[i].teamID,    sizeof(uint8_t));
@@ -131,26 +126,21 @@ void CGame::getPlayerData() {
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);
 
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		if (!players[i].nameAddr) continue;
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].nameAddr, &players[i].name, sizeof(players[i].name));
 	}
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);
 
-	for (int i = 0; i < playerCount; i++)
+	for (int i = 0; i < 64; i++)
 		players[i].name[sizeof(players[i].name) - 1] = '\0';
 
-	static int prevCount = -1;
-	if (playerCount != prevCount) {
-		std::cout << "[SDK]: Active players -> " << playerCount << "\n";
-		prevCount = playerCount;
-	}
 }
 
 void CGame::getWeapons() {
 	// ── Pass 1: pawn → activeWeapon + weaponServices ──
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		if (!players[i].pawn) continue;
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn + client_dll::C_CSPlayerPawn::m_pClippingWeapon,    &players[i].activeWeapon,    sizeof(uint64_t));
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn + client_dll::C_BasePlayerPawn::m_pWeaponServices, &players[i].weaponServices, sizeof(uint64_t));
@@ -159,7 +149,7 @@ void CGame::getWeapons() {
 	DMADevice::Clear(DMADevice::hScatter);
 
 	// ── Pass 2: activeWeapon → activeWeaponID, weaponServices → weaponCount + weaponData ──
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		if (players[i].activeWeapon)
 			DMADevice::PrepareEX(DMADevice::hScatter,
 				players[i].activeWeapon
@@ -176,7 +166,7 @@ void CGame::getWeapons() {
 	DMADevice::Clear(DMADevice::hScatter);
 
 	// ── Pass 3: weaponData → weapon handles ──
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		if (players[i].weaponCount < 0 || players[i].weaponCount > 16) players[i].weaponCount = 0;
 		if (!players[i].weaponData) continue;
 		for (int j = 0; j < players[i].weaponCount; j++)
@@ -186,7 +176,7 @@ void CGame::getWeapons() {
 	DMADevice::Clear(DMADevice::hScatter);
 
 	// ── Pass 4: handle → list entry ──
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		for (int j = 0; j < players[i].weaponCount; j++) {
 			if (!players[i].weapons[j].weaponHandle) continue;
 			int index = players[i].weapons[j].weaponHandle & 0x7FFF;
@@ -197,7 +187,7 @@ void CGame::getWeapons() {
 	DMADevice::Clear(DMADevice::hScatter);
 
 	// ── Pass 5: list entry → weapon controller ──
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		for (int j = 0; j < players[i].weaponCount; j++) {
 			if (!players[i].weapons[j].weaponEntry) continue;
 			int index = players[i].weapons[j].weaponHandle & 0x7FFF;
@@ -208,7 +198,7 @@ void CGame::getWeapons() {
 	DMADevice::Clear(DMADevice::hScatter);
 
 	// ── Pass 6: weapon controller → weapon ID ──
-	for (int i = 0; i < playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		for (int j = 0; j < players[i].weaponCount; j++) {
 			if (!players[i].weapons[j].weaponController) continue;
 			DMADevice::PrepareEX(DMADevice::hScatter,

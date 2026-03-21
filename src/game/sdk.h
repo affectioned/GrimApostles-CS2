@@ -49,7 +49,6 @@ public:
 	char      mapName[32];
 	uintptr_t entityList;
 	CPlayer   players[64];
-	int       playerCount = 0;
 
 	void update();
 

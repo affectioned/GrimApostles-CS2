@@ -43,7 +43,7 @@ void gui::renderPlayers(const CGame& game) {
 	const float aimLength  = 40.0f;
 	const float localZ     = game.localPlayer.position.z;
 
-	for (int i = 0; i < game.playerCount; i++) {
+	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
 		if (!p.controller || !p.health) continue;
 
