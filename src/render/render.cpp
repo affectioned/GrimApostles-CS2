@@ -20,6 +20,9 @@ void gui::gameLoop(const CGame& game) {
 }
 
 void gui::renderMap(ID3D11ShaderResourceView* texture) {
+	ImVec2 display = ImGui::GetIO().DisplaySize;
+	maps::radarSize = std::min(display.x, display.y);
+
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
 	ImGui::SetNextWindowPos(ImVec2(
