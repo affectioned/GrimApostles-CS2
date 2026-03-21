@@ -24,7 +24,7 @@ jobs:
       - name: Set version tag
         id: version
         shell: bash
-        run: echo "tag=build-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+        run: echo "tag=build-$(git log -1 --format='%cd' --date='format:%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
