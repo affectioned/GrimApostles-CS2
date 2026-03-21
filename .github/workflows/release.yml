@@ -19,7 +19,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build Release x64
-        run: msbuild "GrimApostles CS2.sln" /p:Configuration=Release /p:Platform=x64 /m /nologo
+        run: msbuild "GrimApostles CS2.sln" /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /m /nologo
 
       - name: Set version tag
         id: version
