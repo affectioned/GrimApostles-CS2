@@ -1,132 +1,144 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Source Files">
+    <Filter Include="src">
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="src\game">
+      <UniqueIdentifier>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="src\memory">
+      <UniqueIdentifier>{B2C3D4E5-F6A7-8901-BCDE-F12345678901}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\render">
+      <UniqueIdentifier>{C3D4E5F6-A7B8-9012-CDEF-123456789012}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor">
+      <UniqueIdentifier>{D4E5F6A7-B8C9-0123-DEF0-234567890123}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\imgui">
+      <UniqueIdentifier>{E5F6A7B8-C9D0-1234-EF01-345678901234}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\vmm">
+      <UniqueIdentifier>{F6A7B8C9-D0E1-2345-F012-456789012345}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="vendor\dx">
+      <UniqueIdentifier>{A7B8C9D0-E1F2-3456-0123-567890123456}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\DMADevice.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\gui.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\main.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_demo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_draw.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_impl_dx11.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_impl_win32.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_tables.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_widgets.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\sdk.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="src\pch.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\render.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\game\sdk.cpp">
+      <Filter>src\game</Filter>
     </ClCompile>
-    <ClCompile Include="src\resources.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\game\offsets.cpp">
+      <Filter>src\game</Filter>
     </ClCompile>
-    <ClCompile Include="src\updater.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\memory\sigscan.cpp">
+      <Filter>src\memory</Filter>
     </ClCompile>
-    <ClCompile Include="src\offsets.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\memory\dma.cpp">
+      <Filter>src\memory</Filter>
     </ClCompile>
-    <ClCompile Include="src\dx11.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\game\updater.cpp">
+      <Filter>src\game</Filter>
     </ClCompile>
-    <ClCompile Include="src\SigScan.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="src\render\gui.cpp">
+      <Filter>src\render</Filter>
+    </ClCompile>
+    <ClCompile Include="src\render\render.cpp">
+      <Filter>src\render</Filter>
+    </ClCompile>
+    <ClCompile Include="src\render\dx11.cpp">
+      <Filter>src\render</Filter>
+    </ClCompile>
+    <ClCompile Include="src\render\resources.cpp">
+      <Filter>src\render</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\imgui\imgui.cpp">
+      <Filter>vendor\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\imgui\imgui_demo.cpp">
+      <Filter>vendor\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\imgui\imgui_draw.cpp">
+      <Filter>vendor\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\imgui\imgui_impl_dx11.cpp">
+      <Filter>vendor\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\imgui\imgui_impl_win32.cpp">
+      <Filter>vendor\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\imgui\imgui_tables.cpp">
+      <Filter>vendor\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="vendor\imgui\imgui_widgets.cpp">
+      <Filter>vendor\imgui</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\DirectX11\WICTextureLoader.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\pch.h">
+      <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imconfig.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\game\sdk.h">
+      <Filter>src\game</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imgui.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\game\offsets.h">
+      <Filter>src\game</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imgui_impl_dx11.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\memory\sigscan.h">
+      <Filter>src\memory</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imgui_impl_win32.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\game\vec.h">
+      <Filter>src\game</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imgui_internal.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\memory\dma.h">
+      <Filter>src\memory</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imstb_rectpack.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\game\updater.h">
+      <Filter>src\game</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imstb_textedit.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="src\render\gui.h">
+      <Filter>src\render</Filter>
     </ClInclude>
-    <ClInclude Include="include\ImGUI\imstb_truetype.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\dx\WICTextureLoader.h">
+      <Filter>vendor\dx</Filter>
     </ClInclude>
-    <ClInclude Include="include\vmm\leechcore.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imconfig.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\vmm\vmmdll.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imgui.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\DMADevice.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imgui_impl_dx11.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\gui.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imgui_impl_win32.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\vec.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imgui_internal.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\sdk.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imstb_rectpack.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\offsets.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imstb_textedit.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\updater.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\imgui\imstb_truetype.h">
+      <Filter>vendor\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="include\pch.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\vmm\leechcore.h">
+      <Filter>vendor\vmm</Filter>
     </ClInclude>
-    <ClInclude Include="include\SigScan.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="vendor\vmm\vmmdll.h">
+      <Filter>vendor\vmm</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

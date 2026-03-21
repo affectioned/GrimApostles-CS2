@@ -1,5 +1,5 @@
 #include "pch.h"
-#include "DMADevice.h"
+#include "dma.h"
 
 bool DMADevice::bConnected = false;
 DWORD DMADevice::dwAttachedProcessId = NULL;

@@ -1,7 +1,7 @@
 #include "pch.h"
 #include "updater.h"
 #include "offsets.h"
-#include "SigScan.h"
+#include "sigscan.h"
 
 #include <wininet.h>
 #include <regex>

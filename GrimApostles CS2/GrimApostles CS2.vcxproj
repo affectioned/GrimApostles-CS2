@@ -116,7 +116,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\game;$(ProjectDir)src\memory;$(ProjectDir)src\render;$(ProjectDir)vendor\imgui;$(ProjectDir)vendor\vmm;$(ProjectDir)vendor\dx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -137,7 +137,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\game;$(ProjectDir)src\memory;$(ProjectDir)src\render;$(ProjectDir)vendor\imgui;$(ProjectDir)vendor\vmm;$(ProjectDir)vendor\dx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -149,85 +149,85 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="include\ImGUI\imgui.cpp">
+    <ClCompile Include="vendor\imgui\imgui.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_demo.cpp">
+    <ClCompile Include="vendor\imgui\imgui_demo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_draw.cpp">
+    <ClCompile Include="vendor\imgui\imgui_draw.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_impl_dx11.cpp">
+    <ClCompile Include="vendor\imgui\imgui_impl_dx11.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_impl_win32.cpp">
+    <ClCompile Include="vendor\imgui\imgui_impl_win32.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_tables.cpp">
+    <ClCompile Include="vendor\imgui\imgui_tables.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="include\ImGUI\imgui_widgets.cpp">
+    <ClCompile Include="vendor\imgui\imgui_widgets.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\DMADevice.cpp" />
-    <ClCompile Include="src\dx11.cpp" />
-    <ClCompile Include="src\gui.cpp" />
     <ClCompile Include="src\main.cpp" />
-    <ClCompile Include="src\offsets.cpp" />
     <ClCompile Include="src\pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
-    <ClCompile Include="src\render.cpp" />
-    <ClCompile Include="src\resources.cpp" />
-    <ClCompile Include="src\sdk.cpp" />
-    <ClCompile Include="src\SigScan.cpp" />
-    <ClCompile Include="src\updater.cpp" />
+    <ClCompile Include="src\game\sdk.cpp" />
+    <ClCompile Include="src\game\offsets.cpp" />
+    <ClCompile Include="src\memory\sigscan.cpp" />
+    <ClCompile Include="src\memory\dma.cpp" />
+    <ClCompile Include="src\game\updater.cpp" />
+    <ClCompile Include="src\render\gui.cpp" />
+    <ClCompile Include="src\render\render.cpp" />
+    <ClCompile Include="src\render\dx11.cpp" />
+    <ClCompile Include="src\render\resources.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="include\DirectX11\WICTextureLoader.h" />
-    <ClInclude Include="include\DMADevice.h" />
-    <ClInclude Include="include\gui.h" />
-    <ClInclude Include="include\ImGUI\imconfig.h" />
-    <ClInclude Include="include\ImGUI\imgui.h" />
-    <ClInclude Include="include\ImGUI\imgui_impl_dx11.h" />
-    <ClInclude Include="include\ImGUI\imgui_impl_win32.h" />
-    <ClInclude Include="include\ImGUI\imgui_internal.h" />
-    <ClInclude Include="include\ImGUI\imstb_rectpack.h" />
-    <ClInclude Include="include\ImGUI\imstb_textedit.h" />
-    <ClInclude Include="include\ImGUI\imstb_truetype.h" />
-    <ClInclude Include="include\offsets.h" />
-    <ClInclude Include="include\pch.h" />
-    <ClInclude Include="include\sdk.h" />
-    <ClInclude Include="include\SigScan.h" />
-    <ClInclude Include="include\updater.h" />
-    <ClInclude Include="include\vec.h" />
-    <ClInclude Include="include\vmm\leechcore.h" />
-    <ClInclude Include="include\vmm\vmmdll.h" />
+    <ClInclude Include="src\pch.h" />
+    <ClInclude Include="src\game\sdk.h" />
+    <ClInclude Include="src\game\offsets.h" />
+    <ClInclude Include="src\memory\sigscan.h" />
+    <ClInclude Include="src\game\vec.h" />
+    <ClInclude Include="src\memory\dma.h" />
+    <ClInclude Include="src\game\updater.h" />
+    <ClInclude Include="src\render\gui.h" />
+    <ClInclude Include="vendor\dx\WICTextureLoader.h" />
+    <ClInclude Include="vendor\imgui\imconfig.h" />
+    <ClInclude Include="vendor\imgui\imgui.h" />
+    <ClInclude Include="vendor\imgui\imgui_impl_dx11.h" />
+    <ClInclude Include="vendor\imgui\imgui_impl_win32.h" />
+    <ClInclude Include="vendor\imgui\imgui_internal.h" />
+    <ClInclude Include="vendor\imgui\imstb_rectpack.h" />
+    <ClInclude Include="vendor\imgui\imstb_textedit.h" />
+    <ClInclude Include="vendor\imgui\imstb_truetype.h" />
+    <ClInclude Include="vendor\vmm\leechcore.h" />
+    <ClInclude Include="vendor\vmm\vmmdll.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

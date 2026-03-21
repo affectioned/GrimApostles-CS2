@@ -23,35 +23,35 @@ int main() {
 
 	std::cout << "[Main]: GrimApostles CS2 starting\n";
 
-	// Stage 1: Fetch latest class offsets from remote (falls back to hardcoded defaults on failure)
-	// dw* offsets are resolved locally via signature scan after DMA connects (gui::ConnectButton)
-	std::cout << "[Main]: Stage 1 - Fetching class offsets\n";
-	updater::fetchClassOffsets();  // client_dll.hpp  → client_dll::ClassName::m_*
-
-	// Stage 2: Create the Win32 window
-	std::cout << "[Main]: Stage 2 - Creating window\n";
+	// Stage 1: Create the Win32 window
+	std::cout << "[Main]: Stage 1 - Creating window\n";
 	gui::CreateAppWindow();
 
-	// Stage 3: Initialize Direct3D device and swap chain
-	std::cout << "[Main]: Stage 3 - Initializing Direct3D\n";
+	// Stage 2: Initialize Direct3D device and swap chain
+	std::cout << "[Main]: Stage 2 - Initializing Direct3D\n";
 	if (!gui::InitD3D()) {
 		std::cout << "[Main]: Failed to initialize Direct3D, aborting\n";
 		gui::Cleanup();
 		return 1;
 	}
 
-	// Stage 4: Show and maximize the window
-	std::cout << "[Main]: Stage 4 - Showing window\n";
+	// Stage 3: Show and maximize the window
+	std::cout << "[Main]: Stage 3 - Showing window\n";
 	gui::ShowAppWindow();
 
-	// Stage 5: Create ImGui context and bind backends
-	std::cout << "[Main]: Stage 5 - Initializing ImGui\n";
+	// Stage 4: Create ImGui context and bind backends
+	std::cout << "[Main]: Stage 4 - Initializing ImGui\n";
 	gui::InitImGui();
 
-	// Stage 6: Load map bounds and textures
-	std::cout << "[Main]: Stage 6 - Loading resources\n";
+	// Stage 5: Load map bounds and textures
+	std::cout << "[Main]: Stage 5 - Loading resources\n";
 	gui::loadMapBounds();
 	gui::loadTextures();
+
+	// Stage 6: Fetch class offsets in background — window is already visible and interactive.
+	// Falls back to hardcoded defaults on failure. Will be ready long before the user clicks Connect.
+	std::cout << "[Main]: Stage 6 - Fetching class offsets (background)\n";
+	std::thread([] { updater::fetchClassOffsets(); }).detach();
 
 	// Stage 7: Run the render loop (blocks until exit)
 	std::cout << "[Main]: Stage 7 - Entering render loop\n";

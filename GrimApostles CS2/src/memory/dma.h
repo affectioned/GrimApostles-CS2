@@ -1,7 +1,7 @@
 #pragma once
 #include <Windows.h>
-#include "vmm/vmmdll.h"
-#include "vmm/leechcore.h"
+#include "vmmdll.h"
+#include "leechcore.h"
 #include <iostream>
 #include <string.h>
 #include <conio.h>

@@ -1,5 +1,5 @@
 #pragma once
-#include "DMADevice.h"
+#include "dma.h"
 #include "vec.h"
 #include "offsets.h"
 #include <unordered_map>

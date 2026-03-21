@@ -1,11 +1,11 @@
 #pragma once
-#include "DMADevice.h"
+#include "dma.h"
 #include "sdk.h"
-#include "./ImGUI/imgui.h"
-#include "./ImGUI/imgui_impl_win32.h"
-#include "./ImGUI/imgui_impl_dx11.h"
-#include "./ImGUI/imgui_internal.h"
-#include "./DirectX11/WICTextureLoader.h"
+#include "imgui.h"
+#include "imgui_impl_win32.h"
+#include "imgui_impl_dx11.h"
+#include "imgui_internal.h"
+#include "WICTextureLoader.h"
 #include <d3d11.h>
 #pragma comment(lib, "DirectXTK")
 

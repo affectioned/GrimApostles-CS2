@@ -1,6 +1,6 @@
 #include "pch.h"
-#include "SigScan.h"
-#include "DMADevice.h"
+#include "sigscan.h"
+#include "dma.h"
 
 #include <vector>
 
