@@ -27,7 +27,6 @@ namespace client_dll {
 
 	namespace C_BasePlayerPawn {
 		std::ptrdiff_t m_vOldOrigin = 0x1588;
-		std::ptrdiff_t m_pWeaponServices = 0x13D8;
 	}
 
 	namespace CCSPlayerController {
@@ -53,7 +52,4 @@ namespace client_dll {
 		std::ptrdiff_t m_iItemDefinitionIndex = 0x1BA;
 	}
 
-	namespace CPlayer_WeaponServices {
-		std::ptrdiff_t m_hMyWeapons = 0x48;
-	}
 }

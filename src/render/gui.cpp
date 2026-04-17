@@ -63,7 +63,7 @@ void gui::InitImGui() {
 
 void gui::RunLoop() {
 	std::cout << "[GUI]: Render loop started\n";
-	CGame game;
+	CGame game = {};
 	bool done = false;
 
 	while (!done) {
@@ -126,12 +126,19 @@ void gui::ConnectButton() {
 	BeginOverlay("##connect", ImGui::GetIO().DisplaySize.x - 185, 35);
 	if (ImGui::Button(DMADevice::bConnected ? "Disconnect" : "Connect", { 150, 20 })) {
 		if (!DMADevice::bConnected) {
-			DMADevice::Connect();
-			DMADevice::AttachToProcessId();
-			DMADevice::moduleBase = DMADevice::getModuleBase(MODULE);
-			std::cout << "[DMA]: " << PROCESS << " PID=" << std::dec << DMADevice::dwAttachedProcessId
-				<< " client.dll=0x" << std::hex << DMADevice::moduleBase << "\n";
-			updater::sigscanOffsets();
+			if (!DMADevice::Connect() || !DMADevice::AttachToProcessId()) {
+				DMADevice::Disconnect();
+			} else {
+				DMADevice::moduleBase = DMADevice::getModuleBase(DMADevice::kModule);
+				if (!DMADevice::moduleBase) {
+					std::cout << "[DMA]: client.dll not found — disconnecting\n";
+					DMADevice::Disconnect();
+				} else {
+					std::cout << "[DMA]: " << DMADevice::kProcess << " PID=" << std::dec << DMADevice::dwAttachedProcessId
+						<< " client.dll=0x" << std::hex << DMADevice::moduleBase << "\n";
+					updater::sigscanOffsets();
+				}
+			}
 		} else {
 			DMADevice::Disconnect();
 		}

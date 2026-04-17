@@ -1,6 +1,11 @@
 #pragma once
+#include <atomic>
 
 namespace updater {
+	// Set to true (with release semantics) after fetchClassOffsets() completes its writes.
+	// Acquire-load this before reading class offsets to ensure visibility on the main thread.
+	extern std::atomic<bool> classOffsetsReady;
+
 	// Fetches cs2_dumper/output/client_dll.hpp and updates all client_dll::ClassName::m_* offsets.
 	// Falls back to hardcoded defaults in offsets.cpp on failure.
 	bool fetchClassOffsets();

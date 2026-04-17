@@ -105,6 +105,14 @@ void gui::renderPlayers(const CGame& game) {
 			ImGui::GetForegroundDrawList()->AddRectFilled(barTL, barBR, IM_COL32(0, 0, 0, (int)opacity));
 			ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(barTL.x, fillY), barBR, IM_COL32((int)r, (int)g, 0, (int)opacity));
 		}
+
+		// Player name below dot -- skip local player
+		if (p.controller != game.localPlayer.controller && p.name[0]) {
+			ImVec2 textSize = ImGui::CalcTextSize(p.name);
+			ImVec2 namePos  = ImVec2(pos.x - textSize.x * 0.5f, pos.y + 12.f);
+			ImGui::GetForegroundDrawList()->AddText(ImVec2(namePos.x + 1, namePos.y + 1), IM_COL32(0,   0,   0,   (int)opacity), p.name);
+			ImGui::GetForegroundDrawList()->AddText(namePos,                               IM_COL32(255, 255, 255, (int)opacity), p.name);
+		}
 	}
 }
 

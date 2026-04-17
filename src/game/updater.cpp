@@ -9,6 +9,8 @@
 
 static const wchar_t* CLIENT_DLL_URL = L"https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/client_dll.hpp";
 
+std::atomic<bool> updater::classOffsetsReady{false};
+
 static std::string fetchURL(const wchar_t* url) {
 	std::string result;
 	HINTERNET hNet = InternetOpenW(L"GrimApostles", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
@@ -48,6 +50,7 @@ bool updater::fetchClassOffsets() {
 	std::string content = fetchURL(CLIENT_DLL_URL);
 	if (content.empty()) {
 		std::cout << "[Updater]: Failed — using defaults for class offsets." << std::endl;
+		classOffsetsReady.store(true, std::memory_order_release);
 		return false;
 	}
 
@@ -62,7 +65,6 @@ bool updater::fetchClassOffsets() {
 	assign(client_dll::C_BaseEntity::m_iTeamNum,                    "C_BaseEntity",             "m_iTeamNum");
 	assign(client_dll::C_BaseEntity::m_iHealth,                     "C_BaseEntity",             "m_iHealth");
 	assign(client_dll::C_BasePlayerPawn::m_vOldOrigin,              "C_BasePlayerPawn",         "m_vOldOrigin");
-	assign(client_dll::C_BasePlayerPawn::m_pWeaponServices,         "C_BasePlayerPawn",         "m_pWeaponServices");
 	assign(client_dll::CCSPlayerController::m_hPlayerPawn,          "CCSPlayerController",      "m_hPlayerPawn");
 	assign(client_dll::CCSPlayerController::m_sSanitizedPlayerName, "CCSPlayerController",      "m_sSanitizedPlayerName");
 	assign(client_dll::CCSPlayerController::m_iCompTeammateColor,   "CCSPlayerController",      "m_iCompTeammateColor");
@@ -71,9 +73,11 @@ bool updater::fetchClassOffsets() {
 	assign(client_dll::C_EconEntity::m_AttributeManager,            "C_EconEntity",             "m_AttributeManager");
 	assign(client_dll::C_AttributeContainer::m_Item,                "C_AttributeContainer",     "m_Item");
 	assign(client_dll::C_EconItemView::m_iItemDefinitionIndex,      "C_EconItemView",           "m_iItemDefinitionIndex");
-	assign(client_dll::CPlayer_WeaponServices::m_hMyWeapons,        "CPlayer_WeaponServices",   "m_hMyWeapons");
+	// Release-store: all offset writes above are visible to any thread that
+	// subsequently acquire-loads classOffsetsReady.
+	classOffsetsReady.store(true, std::memory_order_release);
 
-	std::cout << "[Updater]: " << updated << "/13 class offsets updated." << std::endl;
+	std::cout << "[Updater]: " << updated << "/11 class offsets updated." << std::endl;
 	return updated > 0;
 }
 

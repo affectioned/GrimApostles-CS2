@@ -21,7 +21,7 @@ bool gui::CreateDeviceD3D(HWND hWnd)
 	sd.SampleDesc.Count = 1;
 	sd.SampleDesc.Quality = 0;
 	sd.Windowed = TRUE;
-	sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+	sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 
 	UINT createDeviceFlags = 0;
 	D3D_FEATURE_LEVEL featureLevel;
@@ -122,10 +122,12 @@ LRESULT WINAPI gui::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		::PostQuitMessage(0);
 		return 0;
 	case WM_GETMINMAXINFO:
+	{
 		MINMAXINFO* minMaxInfo = (MINMAXINFO*)lParam;
 		minMaxInfo->ptMinTrackSize.x = 960;
 		minMaxInfo->ptMinTrackSize.y = 540;
 		return 0;
+	}
 	}
 	return ::DefWindowProcW(hWnd, msg, wParam, lParam);
 }

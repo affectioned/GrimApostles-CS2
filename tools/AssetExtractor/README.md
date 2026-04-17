@@ -7,7 +7,7 @@ Extracts CS2 radar images and weapon icons directly from the game's VPK files an
 ### 1. Python 3.10+
 Must be on PATH. `run.bat` handles the rest (creates a venv, installs Python dependencies).
 
-### 2. VRF CLI
+### 2. VRF Source2Viewer CLI
 Used to decompile Source 2 compiled assets (`.vtex_c` textures and `.vsvg_c` SVGs) from the VPK.
 
 1. Go to https://github.com/ValveResourceFormat/ValveResourceFormat/releases
@@ -16,7 +16,7 @@ Used to decompile Source 2 compiled assets (`.vtex_c` textures and `.vsvg_c` SVG
    ```
    tools/AssetExtractor/vrf/
    ```
-   The script will find whichever `.exe` is in that folder automatically.
+   The folder must contain `Source2Viewer-CLI.exe`. The script finds whichever `.exe` is present automatically.
 
 The `vrf/` folder is gitignored — it is never committed to the repo.
 
@@ -64,15 +64,14 @@ textures/
     ...
 ```
 
-Place the `textures/` folder alongside `GrimApostles CS2.exe` at runtime.
+Place the `textures/` folder alongside `GrimApostles CS2.exe` at runtime. The radar overlay loads every `.png` in `textures/icons/` whose filename matches a known weapon — new icons are picked up automatically without any code changes.
 
 ## How it works
 
-1. Opens `game/csgo/pak01_dir.vpk` using the `vpk` library
-2. Extracts `.vtex_c` (compiled textures) and `.vsvg_c` (compiled SVGs) to a temporary directory
-3. Runs `Decompiler.exe` on the temp directory — outputs `.png` for textures, `.svg` for icons
-4. Renames radar PNGs to the naming convention expected by `resources.cpp`
-5. Converts weapon icon SVGs to PNGs using `svglib`
+1. Passes `game/csgo/pak01_dir.vpk` directly to VRF CLI, which reads and decompiles assets in one step. (The `vpk` Python library is only used for `--list` mode.)
+2. Extracts all `.vtex_c` radar textures from `panorama/images/overheadmaps/`; VRF outputs `.png` files.
+3. Normalises filenames to `<mapname>_radar.png` (e.g. `de_dust2_radar_psd.png` → `de_dust2_radar.png`). All map variants are included — arena maps, night versions, etc.
+4. Extracts `.vsvg_c` weapon icon SVGs from the equipment icons path and converts them to PNGs using `svglib`: renders white silhouettes onto black, then promotes luminance to alpha so icons are white-on-transparent.
 
 ## Adding to the Visual Studio solution
 

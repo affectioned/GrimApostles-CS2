@@ -149,9 +149,7 @@ def _svg_to_png(svg_bytes: bytes, height: int) -> bytes:
 
 # ── Radar extraction ───────────────────────────────────────────────────────────
 
-_RADAR_VPK_PREFIX    = "panorama/images/overheadmaps/"
-_RADAR_SKIP_STARTS   = ("ar_",)                             # map-name prefix
-_RADAR_SKIP_CONTAINS = ("_night", "_v1", "workshop_preview") # name substrings
+_RADAR_VPK_PREFIX = "panorama/images/overheadmaps/"
 
 def extract_radars(pak, cli: Path, vpk_path: Path, out_dir: Path, verbose: bool) -> int:
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -172,10 +170,6 @@ def extract_radars(pak, cli: Path, vpk_path: Path, out_dir: Path, verbose: bool)
         for img_file in candidates:
             stem = img_file.stem
             if "_radar" not in stem:
-                continue
-            if stem.startswith(_RADAR_SKIP_STARTS):
-                continue
-            if any(s in stem for s in _RADAR_SKIP_CONTAINS):
                 continue
             # de_dust2_radar_psd → de_dust2_radar.png
             out_name = re.sub(r"_radar.*$", "_radar", stem) + ".png"

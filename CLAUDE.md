@@ -19,8 +19,8 @@ msbuild "GrimApostles CS2.sln" /p:Configuration=Release /p:Platform=x64 /p:Platf
 
 Place alongside the `.exe` at runtime:
 - `vmm.dll`, `leechcore.dll`, `FTD3XX.dll` — from PCILeech releases
-- `textures/maps/` — radar PNG images per map (e.g. `de_dust2_radar.png`)
-- `textures/icons/` — weapon icon PNGs keyed by weapon name (e.g. `ak47.png`)
+- `textures/maps/` — radar PNG images per map (e.g. `de_dust2_radar.png`); all `*_radar.png` files are loaded automatically
+- `textures/icons/` — weapon icon PNGs by name (e.g. `ak47.png`); any `.png` matching `kWeaponIDs` in `resources.cpp` is loaded automatically
 
 ## Architecture
 
@@ -50,6 +50,12 @@ Place alongside the `.exe` at runtime:
 
 ### Texture loading
 `LoadImageTexture()` in `dx11.cpp` — two overloads, one optionally outputs pixel dimensions. Used exclusively in `resources.cpp`.
+
+### Dynamic texture loading system
+Both maps and icons are loaded by scanning their folders at startup via `std::filesystem::directory_iterator` — no hardcoded load calls.
+- **Maps**: scans `textures/maps/` for `*_radar.png`; strips `_radar` suffix to get the key used in `mapTextures`. Multi-level variants (`de_nuke_lower`, `de_vertigo_lower`) load automatically if the PNG exists.
+- **Icons**: scans `textures/icons/` for `.png` files whose stem matches a key in the static `kWeaponIDs` table in `resources.cpp`. To add a new weapon, add its name→ID entry there — do not add `loadDim()` calls.
+- `<filesystem>` is included in `pch.h`.
 
 ### WinINet is already linked
 `updater.cpp` and `dx11.cpp` both `#pragma comment(lib, "wininet")`. Any new HTTP fetching can reuse the existing `fetchURL()` static helper in `updater.cpp`.

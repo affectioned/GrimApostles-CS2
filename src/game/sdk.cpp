@@ -1,7 +1,12 @@
 #include "pch.h"
 #include "sdk.h"
+#include "updater.h"
 
 void CGame::update() {
+	// Acquire-load: ensures all class offset writes from fetchClassOffsets() (release-store)
+	// are visible on this thread before we use them in the reads below.
+	(void)updater::classOffsetsReady.load(std::memory_order_acquire);
+
 	getMap();
 	getLocalPlayer();
 	getEntityList();
@@ -107,7 +112,6 @@ void CGame::getPlayers() {
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].listEntry2 + 0x70 * (players[i].pawnAddr & 0x1FF), &players[i].pawn, sizeof(uint64_t));
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);
-
 }
 
 
@@ -116,12 +120,13 @@ void CGame::getPlayers() {
 void CGame::getPlayerData() {
 	for (int i = 0; i < 64; i++) {
 		if (!players[i].controller || !players[i].pawn) continue;
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName, &players[i].nameAddr,  sizeof(uint64_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::C_BaseEntity::m_iTeamNum,                    &players[i].teamID,    sizeof(uint8_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iCompTeammateColor,   &players[i].color,     sizeof(DWORD));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BaseEntity::m_iHealth,                    &players[i].health,    sizeof(uint32_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_angEyeAngles,             &players[i].eyeAngles, sizeof(Vector2));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BasePlayerPawn::m_vOldOrigin,             &players[i].position,  sizeof(Vector3));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName, &players[i].nameAddr,     sizeof(uint64_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::C_BaseEntity::m_iTeamNum,                    &players[i].teamID,       sizeof(uint8_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iCompTeammateColor,   &players[i].color,        sizeof(DWORD));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BaseEntity::m_iHealth,                    &players[i].health,       sizeof(uint32_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_angEyeAngles,             &players[i].eyeAngles,    sizeof(Vector2));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BasePlayerPawn::m_vOldOrigin,             &players[i].position,     sizeof(Vector3));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_pClippingWeapon,          &players[i].activeWeapon, sizeof(uint64_t));
 	}
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);
@@ -135,79 +140,21 @@ void CGame::getPlayerData() {
 
 	for (int i = 0; i < 64; i++)
 		players[i].name[sizeof(players[i].name) - 1] = '\0';
-
 }
 
+// ─── Weapons ─────────────────────────────────────────────────────────────────
+
 void CGame::getWeapons() {
-	// ── Pass 1: pawn → activeWeapon + weaponServices ──
+	// activeWeapon handle was already fetched in getPlayerData pass 1.
+	// Single pass: resolve handle → item definition index (weapon ID for icon lookup).
 	for (int i = 0; i < 64; i++) {
-		if (!players[i].pawn) continue;
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn + client_dll::C_CSPlayerPawn::m_pClippingWeapon,    &players[i].activeWeapon,    sizeof(uint64_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn + client_dll::C_BasePlayerPawn::m_pWeaponServices, &players[i].weaponServices, sizeof(uint64_t));
-	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	// ── Pass 2: activeWeapon → activeWeaponID, weaponServices → weaponCount + weaponData ──
-	for (int i = 0; i < 64; i++) {
-		if (players[i].activeWeapon)
-			DMADevice::PrepareEX(DMADevice::hScatter,
-				players[i].activeWeapon
-				+ client_dll::C_EconEntity::m_AttributeManager
-				+ client_dll::C_AttributeContainer::m_Item
-				+ client_dll::C_EconItemView::m_iItemDefinitionIndex,
-				&players[i].activeWeaponID, sizeof(uint16_t));
-		if (players[i].weaponServices) {
-			DMADevice::PrepareEX(DMADevice::hScatter, players[i].weaponServices + client_dll::CPlayer_WeaponServices::m_hMyWeapons,        &players[i].weaponCount, sizeof(int32_t));
-			DMADevice::PrepareEX(DMADevice::hScatter, players[i].weaponServices + client_dll::CPlayer_WeaponServices::m_hMyWeapons + 0x8,  &players[i].weaponData,  sizeof(uint64_t));
-		}
-	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	// ── Pass 3: weaponData → weapon handles ──
-	for (int i = 0; i < 64; i++) {
-		if (players[i].weaponCount < 0 || players[i].weaponCount > 16) players[i].weaponCount = 0;
-		if (!players[i].weaponData) continue;
-		for (int j = 0; j < players[i].weaponCount; j++)
-			DMADevice::PrepareEX(DMADevice::hScatter, players[i].weaponData + j * sizeof(uint32_t), &players[i].weapons[j].weaponHandle, sizeof(uint32_t));
-	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	// ── Pass 4: handle → list entry ──
-	for (int i = 0; i < 64; i++) {
-		for (int j = 0; j < players[i].weaponCount; j++) {
-			if (!players[i].weapons[j].weaponHandle) continue;
-			int index = players[i].weapons[j].weaponHandle & 0x7FFF;
-			DMADevice::PrepareEX(DMADevice::hScatter, entityList + (0x8 * (index >> 9) + 16), &players[i].weapons[j].weaponEntry, sizeof(uint64_t));
-		}
-	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	// ── Pass 5: list entry → weapon controller ──
-	for (int i = 0; i < 64; i++) {
-		for (int j = 0; j < players[i].weaponCount; j++) {
-			if (!players[i].weapons[j].weaponEntry) continue;
-			int index = players[i].weapons[j].weaponHandle & 0x7FFF;
-			DMADevice::PrepareEX(DMADevice::hScatter, players[i].weapons[j].weaponEntry + 0x70 * (index & 0x1FF), &players[i].weapons[j].weaponController, sizeof(uint64_t));
-		}
-	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	// ── Pass 6: weapon controller → weapon ID ──
-	for (int i = 0; i < 64; i++) {
-		for (int j = 0; j < players[i].weaponCount; j++) {
-			if (!players[i].weapons[j].weaponController) continue;
-			DMADevice::PrepareEX(DMADevice::hScatter,
-				players[i].weapons[j].weaponController
-				+ client_dll::C_EconEntity::m_AttributeManager
-				+ client_dll::C_AttributeContainer::m_Item
-				+ client_dll::C_EconItemView::m_iItemDefinitionIndex,
-				&players[i].weapons[j].weaponID, sizeof(uint16_t));
-		}
+		if (!players[i].activeWeapon) continue;
+		DMADevice::PrepareEX(DMADevice::hScatter,
+			players[i].activeWeapon
+			+ client_dll::C_EconEntity::m_AttributeManager
+			+ client_dll::C_AttributeContainer::m_Item
+			+ client_dll::C_EconItemView::m_iItemDefinitionIndex,
+			&players[i].activeWeaponID, sizeof(uint16_t));
 	}
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);

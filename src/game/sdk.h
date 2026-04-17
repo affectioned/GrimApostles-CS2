@@ -14,14 +14,6 @@ public:
 	mapData() : xBound(0.0f), yBound(0.0f), scale(0.0f) {}
 };
 
-class CWeapon {
-public:
-	uint32_t weaponHandle;
-	uint64_t weaponEntry;
-	uint64_t weaponController;
-	uint16_t weaponID;
-};
-
 class CPlayer {
 public:
 	uint64_t controller;
@@ -37,10 +29,6 @@ public:
 	Vector3  position;
 	uint64_t activeWeapon;
 	uint16_t activeWeaponID;
-	uint64_t weaponServices;
-	int32_t  weaponCount;
-	uint64_t weaponData;
-	CWeapon  weapons[16];
 };
 
 class CGame {

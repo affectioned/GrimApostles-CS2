@@ -2,9 +2,9 @@
 #include "dma.h"
 
 bool DMADevice::bConnected = false;
-DWORD DMADevice::dwAttachedProcessId = NULL;
+DWORD DMADevice::dwAttachedProcessId = 0;
 VMM_HANDLE DMADevice::hVMM = NULL;
-uint64_t DMADevice::moduleBase = NULL;
+uint64_t DMADevice::moduleBase = 0;
 VMMDLL_SCATTER_HANDLE DMADevice::hScatter = NULL;
 
 void DMADevice::ShowKeyPress() {
@@ -16,7 +16,10 @@ void DMADevice::ShowKeyPress() {
 bool DMADevice::Connect() {
 	if (bConnected) return true;
 
-	LPSTR args[] = { _strdup(""), _strdup("-device"), _strdup("fpga://algo =0") };
+	char arg0[] = "";
+	char arg1[] = "-device";
+	char arg2[] = "fpga://algo=0";
+	LPSTR args[] = { arg0, arg1, arg2 };
 	hVMM = VMMDLL_Initialize(3, args);
 	if (!hVMM) {
 		std::cout << "[DMA]: Failed to initialize VMM\n";
@@ -31,7 +34,8 @@ bool DMADevice::Connect() {
 		!VMMDLL_ConfigGet(hVMM, LC_OPT_FPGA_VERSION_MINOR, &minor)) {
 		std::cout << "[DMA]: Failed to read FPGA config\n";
 		VMMDLL_Close(hVMM);
-		VMMDLL_Scatter_CloseHandle(hScatter);
+		if (hScatter) VMMDLL_Scatter_CloseHandle(hScatter);
+		hVMM = NULL; hScatter = NULL;
 		return false;
 	}
 	std::cout << "[DMA]: FPGA ID=" << id << " v" << major << "." << minor << "\n";
@@ -58,12 +62,12 @@ void DMADevice::Disconnect() {
 	VMMDLL_Close(hVMM);
 	VMMDLL_Scatter_CloseHandle(hScatter);
 	hVMM = NULL; hScatter = NULL;
-	dwAttachedProcessId = NULL; moduleBase = NULL;
+	dwAttachedProcessId = 0; moduleBase = 0;
 }
 
 bool DMADevice::AttachToProcessId() {
 	if (!bConnected) return false;
-	if (!VMMDLL_PidGetFromName(hVMM, PROCESS, &dwAttachedProcessId)) {
+	if (!VMMDLL_PidGetFromName(hVMM, const_cast<LPSTR>(kProcess), &dwAttachedProcessId)) {
 		std::cout << "[DMA]: Failed to find PID\n";
 		return false;
 	}
@@ -75,12 +79,12 @@ bool DMADevice::AttachToProcessId() {
 		std::cout << "[DMA]: Failed to get process information\n";
 		return false;
 	}
-	std::cout << "[DMA]: Attached to " << PROCESS << " (PID: " << dwAttachedProcessId << ")\n";
+	std::cout << "[DMA]: Attached to " << kProcess << " (PID: " << dwAttachedProcessId << ")\n";
 	return true;
 }
 
-uint64_t DMADevice::getModuleBase(LPSTR moduleName) {
-	return VMMDLL_ProcessGetModuleBaseU(hVMM, dwAttachedProcessId, moduleName);
+uint64_t DMADevice::getModuleBase(const char* moduleName) {
+	return VMMDLL_ProcessGetModuleBaseU(hVMM, dwAttachedProcessId, const_cast<LPSTR>(moduleName));
 }
 
 bool DMADevice::Clear(VMMDLL_SCATTER_HANDLE hSCATTER) {
