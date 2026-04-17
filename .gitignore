@@ -21,4 +21,9 @@ build/
 # ========================
 Thumbs.db
 Desktop.ini
-/.claude
+
+# ========================
+# Tools
+# ========================
+tools/AssetExtractor/vrf/
+tools/AssetExtractor/.venv/

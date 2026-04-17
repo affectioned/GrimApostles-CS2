@@ -1,0 +1,4 @@
+vpk==1.4.0
+svglib
+reportlab
+Pillow
