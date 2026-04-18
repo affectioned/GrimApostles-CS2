@@ -6,6 +6,8 @@ A DMA-based radar for Counter-Strike 2 built with ImGui and DirectX 11. Uses PCI
 
 **Questions or feedback? Discord: @grimapostles** (original author)
 
+[Technical documentation](https://github.com/affectioned/GrimApostles-CS2/blob/main/CLAUDE.md)
+
 ---
 
 > **Educational Disclaimer**
