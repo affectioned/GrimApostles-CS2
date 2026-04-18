@@ -56,7 +56,7 @@ Place alongside the `.exe` at runtime:
 
 ### Dynamic texture loading system
 Both maps and icons are loaded by scanning their folders at startup via `std::filesystem::directory_iterator` — no hardcoded load calls.
-- **Maps**: scans `textures/maps/` for `*_radar.png`; strips `_radar` suffix to get the key used in `mapTextures`. Multi-level variants (`de_nuke_lower`, `de_vertigo_lower`) load automatically if the PNG exists.
+- **Maps**: scans `textures/maps/` for `*_radar.png` (textures) and `*_radar.txt` (bounds). The txt files are CS2's overview KeyValues files extracted from the VPK by AssetExtractor (`resource/overviews/*.txt`) and renamed `<mapname>_radar.txt`. `loadMapBounds()` parses `pos_x`/`pos_y`/`scale` from each — no hardcoded bounds. Multi-level variants (`de_nuke_lower`, `de_vertigo_lower`) inherit the base map's bounds after the scan. Note: the overviews folder does **not** exist on the filesystem — files are inside `pak01_dir.vpk` and extracted via the `vpk` Python library.
 - **Icons**: scans `textures/icons/` for `.png` files whose stem matches a key in the static `kWeaponIDs` table in `resources.cpp`. To add a new weapon, add its name→ID entry there — do not add `loadDim()` calls.
 - `<filesystem>` is included in `pch.h`.
 

@@ -147,6 +147,29 @@ def _svg_to_png(svg_bytes: bytes, height: int) -> bytes:
     return buf.getvalue()
 
 
+# ── Overview txt extraction ────────────────────────────────────────────────────
+
+def extract_overview_txts(pak, out_dir: Path, verbose: bool) -> int:
+    """Extract *_radar.txt bounds files from the VPK (resource/overviews/*.txt).
+    Files are renamed <mapname>_radar.txt to match the PNG naming convention."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for path in pak:
+        if not path.startswith("resource/overviews/") or not path.endswith(".txt"):
+            continue
+        stem     = Path(path).stem          # e.g. "de_dust2"
+        out_name = stem + "_radar.txt"      # e.g. "de_dust2_radar.txt"
+        try:
+            data = pak[path].read()
+            (out_dir / out_name).write_bytes(data)
+            count += 1
+            if verbose:
+                print(f"  [overview] {Path(path).name}  ->  {out_name}")
+        except Exception as e:
+            print(f"  [overview] FAILED {path}: {e}", file=sys.stderr)
+    return count
+
+
 # ── Radar extraction ───────────────────────────────────────────────────────────
 
 _RADAR_VPK_PREFIX = "panorama/images/overheadmaps/"
@@ -270,6 +293,8 @@ def main():
         pak = vpk.open(str(vpk_path))
         n = extract_radars(pak, cli, vpk_path, out_root / "maps", args.verbose)
         print(f"Radars   : {n} extracted  ->  {out_root / 'maps'}")
+        n = extract_overview_txts(pak, out_root / "maps", args.verbose)
+        print(f"Overviews: {n} extracted  ->  {out_root / 'maps'}")
 
     if not args.no_icons:
         pak = vpk.open(str(vpk_path))

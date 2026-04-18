@@ -72,19 +72,53 @@ static const std::unordered_map<std::string, int> kWeaponIDs = {
 	{ "knife_kukri",         526 },
 };
 
+static float parseKVFloat(const std::string& content, const char* key) {
+	std::string search = std::string("\"") + key + "\"";
+	auto pos = content.find(search);
+	if (pos == std::string::npos) return 0.0f;
+	pos = content.find('"', pos + search.size());
+	if (pos == std::string::npos) return 0.0f;
+	++pos;
+	auto end = content.find('"', pos);
+	if (end == std::string::npos) return 0.0f;
+	try { return std::stof(content.substr(pos, end - pos)); }
+	catch (...) { return 0.0f; }
+}
+
 void gui::loadMapBounds() {
-	maps::mapBounds["cs_italy"]        = mapData(-2647.0f, 2592.0f, 4.6f);
-	maps::mapBounds["cs_office"]       = mapData(-1838.0f, 1858.0f, 4.1f);
-	maps::mapBounds["de_ancient"]      = mapData(-2953.0f, 2164.0f, 5.0f);
-	maps::mapBounds["de_anubis"]       = mapData(-2796.0f, 3328.0f, 5.22f);
-	maps::mapBounds["de_dust2"]        = mapData(-2476.0f, 3239.0f, 4.4f);
-	maps::mapBounds["de_inferno"]      = mapData(-2087.0f, 3870.0f, 4.9f);
-	maps::mapBounds["de_mirage"]       = mapData(-3230.0f, 1713.0f, 5.0f);
-	maps::mapBounds["de_nuke"]         = mapData(-3453.0f, 2887.0f, 7.0f);
-	maps::mapBounds["de_overpass"]     = mapData(-4831.0f, 1781.0f, 5.2f);
-	maps::mapBounds["de_vertigo"]      = mapData(-3168.0f, 1762.0f, 4.0f);
-	maps::mapBounds["de_train"]        = mapData(-2308.0f, 2078.0f, 4.082077f);
-	std::cout << "[Resources]: Loaded " << maps::mapBounds.size() << " map bounds\n";
+	namespace fs = std::filesystem;
+	const fs::path mapDir = L".\\textures\\maps";
+	int count = 0;
+	try {
+		for (const auto& entry : fs::directory_iterator(mapDir)) {
+			if (entry.path().extension() != L".txt") continue;
+			std::string stem = entry.path().stem().string();
+			const std::string suffix = "_radar";
+			if (stem.size() <= suffix.size() ||
+			    stem.compare(stem.size() - suffix.size(), suffix.size(), suffix) != 0) continue;
+			std::string mapName = stem.substr(0, stem.size() - suffix.size());
+
+			std::ifstream f(entry.path());
+			if (!f) continue;
+			std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+
+			float posX  = parseKVFloat(content, "pos_x");
+			float posY  = parseKVFloat(content, "pos_y");
+			float scale = parseKVFloat(content, "scale");
+			if (scale == 0.0f) continue;
+
+			maps::mapBounds[mapName] = mapData(posX, posY, scale);
+			count++;
+		}
+	} catch (const fs::filesystem_error& e) {
+		std::cerr << "[Resources]: Could not scan maps folder: " << e.what() << "\n";
+	}
+
+	// Multi-level variants share the base map's bounds
+	if (maps::mapBounds.count("de_nuke"))    maps::mapBounds["de_nuke_lower"]    = maps::mapBounds["de_nuke"];
+	if (maps::mapBounds.count("de_vertigo")) maps::mapBounds["de_vertigo_lower"] = maps::mapBounds["de_vertigo"];
+
+	std::cout << "[Resources]: Loaded " << count << " map bounds\n";
 }
 
 void gui::loadTextures() {
