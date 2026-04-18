@@ -423,7 +423,7 @@ void gui::RenderTeamPanels(const CGame& game) {
 
 	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
-		if (!p.controller || p.teamID == myTeam || p.ping == 0) continue;
+		if (!p.controller || p.teamID < 2 || p.teamID == myTeam || p.health == 0) continue;
 		renderPlayerEntry(p, game, true);
 	}
 	ImGui::End();

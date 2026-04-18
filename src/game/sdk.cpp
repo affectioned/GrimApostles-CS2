@@ -18,24 +18,117 @@ static bool isValidAscii(const char* s, size_t n) {
 }
 
 void CGame::update() {
-	// Acquire-load: ensures all class offset writes from fetchClassOffsets() (release-store)
-	// are visible on this thread before we use them in the reads below.
 	(void)updater::classOffsetsReady.load(std::memory_order_acquire);
 
-	// Snapshot last-good player state before getPlayers() zeroes the array.
 	CPlayer prev[64];
 	memcpy(prev, players, sizeof(prev));
 
-	getMap();
-	getLocalPlayer();
-	getEntityList();
-	getPlayers();
+	// ── Scatter A: all module-level offsets in one batch (was 4 separate MemReadPtrs) ──
+	uint64_t globalVarsPtr = 0, newController = 0, newPawn = 0, newEntityList = 0;
+	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwGlobalVars,            &globalVarsPtr, sizeof(uint64_t));
+	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwLocalPlayerController, &newController, sizeof(uint64_t));
+	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwLocalPlayerPawn,       &newPawn,       sizeof(uint64_t));
+	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwEntityList,            &newEntityList, sizeof(uint64_t));
+	DMADevice::ExecuteRead(DMADevice::hScatter);
+	DMADevice::Clear(DMADevice::hScatter);
+
+	if (newController && !isValidPtr(newController)) newController = 0;
+	if (newPawn       && !isValidPtr(newPawn))       newPawn       = 0;
+	if (!isValidPtr(newEntityList))                  newEntityList = 0;
+	if (!isValidPtr(globalVarsPtr))                  globalVarsPtr = 0;
+
+	if (newEntityList) {
+		static uint64_t prevEL = 0;
+		if (newEntityList != prevEL) { std::cout << "[SDK]: Entity list -> 0x" << std::hex << newEntityList << std::dec << "\n"; prevEL = newEntityList; }
+		entityList = newEntityList;
+	}
+	{
+		static uint64_t prevCtrl = 0;
+		if (newController != prevCtrl) { std::cout << "[SDK]: Local controller -> 0x" << std::hex << newController << std::dec << "\n"; prevCtrl = newController; }
+	}
+	localPlayer.controller = newController;
+	localPlayer.pawn       = newPawn;
+
+	// ── Scatter B: one level deep + entity chunk pointers (was separate calls + scatter pass 1) ──
+	// Batches: mapPtr, local player fields, and all 64 entity list chunk reads in one round trip.
+	uint64_t mapPtr = 0;
+	memset(players, 0, sizeof(players));
+
+	if (globalVarsPtr)
+		DMADevice::PrepareEX(DMADevice::hScatter, globalVarsPtr + 0x0188,                                                          &mapPtr,               sizeof(uint64_t));
+	if (localPlayer.controller) {
+		DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.controller + client_dll::C_BaseEntity::m_iTeamNum,                   &localPlayer.teamID,   sizeof(uint8_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName, &localPlayer.nameAddr, sizeof(uint64_t));
+	}
+	if (localPlayer.pawn)
+		DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.pawn + client_dll::C_BasePlayerPawn::m_vOldOrigin,                   &localPlayer.position, sizeof(Vector3));
+	for (int i = 0; i < 64; i++)
+		DMADevice::PrepareEX(DMADevice::hScatter, entityList + (0x8 * ((i + 1) >> 9) + 16), &players[i].listEntry, sizeof(uint64_t));
+	DMADevice::ExecuteRead(DMADevice::hScatter);
+	DMADevice::Clear(DMADevice::hScatter);
+
+	// ── Scatter C: string data (was 2 separate MemReads) ──────────────────────
+	char mapNameBuf[32] = {}, nameBuf[32] = {};
+	bool readingMap  = isValidPtr(mapPtr);
+	bool readingName = isValidPtr(localPlayer.nameAddr);
+
+	if (readingMap)  DMADevice::PrepareEX(DMADevice::hScatter, mapPtr,                  mapNameBuf, sizeof(mapNameBuf));
+	if (readingName) DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.nameAddr,    nameBuf,    sizeof(nameBuf));
+	DMADevice::ExecuteRead(DMADevice::hScatter);
+	DMADevice::Clear(DMADevice::hScatter);
+
+	if (readingMap) {
+		mapNameBuf[sizeof(mapNameBuf) - 1] = '\0';
+		if (isValidAscii(mapNameBuf, sizeof(mapNameBuf))) {
+			static char prevMap[32] = {};
+			if (strncmp(mapNameBuf, prevMap, sizeof(mapNameBuf)) != 0) {
+				std::cout << "[SDK]: Map -> " << mapNameBuf << "\n";
+				memcpy(prevMap, mapNameBuf, sizeof(mapNameBuf));
+			}
+			memcpy(mapName, mapNameBuf, sizeof(mapName));
+		}
+	}
+	if (readingName) {
+		nameBuf[sizeof(nameBuf) - 1] = '\0';
+		if (isValidAscii(nameBuf, sizeof(nameBuf))) {
+			memcpy(localPlayer.name, nameBuf, sizeof(localPlayer.name));
+			static char prevName[32] = {};
+			if (strncmp(localPlayer.name, prevName, sizeof(prevName)) != 0) {
+				std::cout << "[SDK]: Local player name -> " << localPlayer.name << "\n";
+				memcpy(prevName, localPlayer.name, sizeof(prevName));
+			}
+		}
+	}
+
+	// ── Entity chain passes 2–5 (guarded: only prepare reads for valid slots) ──
+	for (int i = 0; i < 64; i++)
+		if (players[i].listEntry)
+			DMADevice::PrepareEX(DMADevice::hScatter, players[i].listEntry + 0x70 * ((i + 1) & 0x1FF), &players[i].controller, sizeof(uint64_t));
+	DMADevice::ExecuteRead(DMADevice::hScatter);
+	DMADevice::Clear(DMADevice::hScatter);
+
+	for (int i = 0; i < 64; i++)
+		if (players[i].controller)
+			DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_hPlayerPawn, &players[i].pawnAddr, sizeof(uint32_t));
+	DMADevice::ExecuteRead(DMADevice::hScatter);
+	DMADevice::Clear(DMADevice::hScatter);
+
+	for (int i = 0; i < 64; i++)
+		if (players[i].pawnAddr)
+			DMADevice::PrepareEX(DMADevice::hScatter, entityList + 0x8 * ((players[i].pawnAddr & 0x7FFF) >> 9) + 16, &players[i].listEntry2, sizeof(uint64_t));
+	DMADevice::ExecuteRead(DMADevice::hScatter);
+	DMADevice::Clear(DMADevice::hScatter);
+
+	for (int i = 0; i < 64; i++)
+		if (players[i].listEntry2)
+			DMADevice::PrepareEX(DMADevice::hScatter, players[i].listEntry2 + 0x70 * (players[i].pawnAddr & 0x1FF), &players[i].pawn, sizeof(uint64_t));
+	DMADevice::ExecuteRead(DMADevice::hScatter);
+	DMADevice::Clear(DMADevice::hScatter);
+
 	getPlayerData();
 	getWeapons();
 
-	// Restore cached data for any slot where the new read produced garbage.
-	// VMMDLL_FLAG_ZEROPAD_ON_FAIL handles full read failures (zeros), but
-	// partial/corrupted reads can produce non-zero garbage addresses.
+	// ── Cache restore ──────────────────────────────────────────────────────────
 	for (int i = 0; i < 64; i++) {
 		bool ctrlGarbage = players[i].controller && !isValidPtr(players[i].controller);
 		bool pawnGarbage = players[i].pawn       && !isValidPtr(players[i].pawn);
@@ -44,124 +137,10 @@ void CGame::update() {
 				players[i] = prev[i];
 			continue;
 		}
-		// Even if pointers look valid, restore name if it came back as garbage.
 		if (!isValidAscii(players[i].name, sizeof(players[i].name)) &&
 			isValidAscii(prev[i].name, sizeof(prev[i].name)))
 			memcpy(players[i].name, prev[i].name, sizeof(players[i].name));
 	}
-}
-
-
-// ─── Map ─────────────────────────────────────────────────────────────────────
-
-void CGame::getMap() {
-	auto globalVarsPtr = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwGlobalVars);
-	if (!isValidPtr(globalVarsPtr)) return;
-
-	uintptr_t mapPtr = DMADevice::MemReadPtr<uint64_t>(globalVarsPtr + 0x0188);
-	if (!isValidPtr(mapPtr)) return;
-
-	char newMapName[32] = {};
-	DMADevice::MemRead(mapPtr, newMapName, sizeof(newMapName));
-	newMapName[sizeof(newMapName) - 1] = '\0';
-
-	// Only commit if it looks like a real map name (printable ASCII, starts with "de_"/"cs_" etc.).
-	if (!isValidAscii(newMapName, sizeof(newMapName))) return;
-
-	static char prevMap[32] = {};
-	if (strncmp(newMapName, prevMap, sizeof(newMapName)) != 0) {
-		std::cout << "[SDK]: Map -> " << newMapName << "\n";
-		memcpy(prevMap, newMapName, sizeof(newMapName));
-	}
-	memcpy(mapName, newMapName, sizeof(mapName));
-}
-
-void CGame::getEntityList() {
-	uint64_t newEntityList = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwEntityList);
-	if (!isValidPtr(newEntityList)) return;
-
-	static uint64_t prevEntityList = 0;
-	if (newEntityList != prevEntityList) {
-		std::cout << "[SDK]: Entity list -> 0x" << std::hex << newEntityList << std::dec << "\n";
-		prevEntityList = newEntityList;
-	}
-	entityList = newEntityList;
-}
-
-
-// ─── Local player ─────────────────────────────────────────────────────────────
-
-void CGame::getLocalPlayer() {
-	uint64_t newController = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwLocalPlayerController);
-
-	// Accept zero (player not in-game) but reject garbage pointers.
-	if (newController && !isValidPtr(newController)) return;
-
-	static uint64_t prevController = 0;
-	if (newController != prevController) {
-		std::cout << "[SDK]: Local controller -> 0x" << std::hex << newController << std::dec << "\n";
-		prevController = newController;
-	}
-	localPlayer.controller = newController;
-	if (!localPlayer.controller) return;
-
-	uint64_t newPawn = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwLocalPlayerPawn);
-	if (newPawn && !isValidPtr(newPawn)) return;
-	localPlayer.pawn   = newPawn;
-	localPlayer.teamID = DMADevice::MemReadPtr<uint8_t>(localPlayer.controller + client_dll::C_BaseEntity::m_iTeamNum);
-
-	if (localPlayer.pawn)
-		DMADevice::MemRead(localPlayer.pawn + client_dll::C_BasePlayerPawn::m_vOldOrigin, &localPlayer.position, sizeof(Vector3));
-
-	localPlayer.nameAddr = DMADevice::MemReadPtr<uint64_t>(localPlayer.controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName);
-	if (!isValidPtr(localPlayer.nameAddr)) return;
-
-	char newName[32] = {};
-	DMADevice::MemRead(localPlayer.nameAddr, &newName, sizeof(newName));
-	newName[sizeof(newName) - 1] = '\0';
-
-	// Only update name if it looks valid; keep previous on garbage reads.
-	if (!isValidAscii(newName, sizeof(newName))) return;
-	memcpy(localPlayer.name, newName, sizeof(localPlayer.name));
-
-	static char prevName[32] = {};
-	if (strncmp(localPlayer.name, prevName, sizeof(prevName)) != 0) {
-		std::cout << "[SDK]: Local player name -> " << localPlayer.name << "\n";
-		memcpy(prevName, localPlayer.name, sizeof(prevName));
-	}
-}
-
-
-// ─── Entity pointer chain ─────────────────────────────────────────────────────
-// Each pass depends on the previous result, so they must remain sequential.
-
-void CGame::getPlayers() {
-	memset(players, 0, sizeof(players));
-
-	for (int i = 0; i < 64; i++)
-		DMADevice::PrepareEX(DMADevice::hScatter, entityList + (0x8 * ((i + 1) >> 9) + 16), &players[i].listEntry, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	for (int i = 0; i < 64; i++)
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].listEntry + 0x70 * ((i + 1) & 0x1FF), &players[i].controller, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	for (int i = 0; i < 64; i++)
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_hPlayerPawn, &players[i].pawnAddr, sizeof(uint32_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	for (int i = 0; i < 64; i++)
-		DMADevice::PrepareEX(DMADevice::hScatter, entityList + 0x8 * ((players[i].pawnAddr & 0x7FFF) >> 9) + 16, &players[i].listEntry2, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	for (int i = 0; i < 64; i++)
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].listEntry2 + 0x70 * (players[i].pawnAddr & 0x1FF), &players[i].pawn, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
 }
 
 
@@ -196,7 +175,7 @@ void CGame::getPlayerData() {
 	DMADevice::Clear(DMADevice::hScatter);
 
 	for (int i = 0; i < 64; i++) {
-		players[i].name[sizeof(players[i].name) - 1]          = '\0';
+		players[i].name[sizeof(players[i].name) - 1]                  = '\0';
 		players[i].lastPlaceName[sizeof(players[i].lastPlaceName) - 1] = '\0';
 	}
 }
@@ -204,8 +183,6 @@ void CGame::getPlayerData() {
 // ─── Weapons ─────────────────────────────────────────────────────────────────
 
 void CGame::getWeapons() {
-	// activeWeapon handle was already fetched in getPlayerData pass 1.
-	// Single pass: resolve handle → item definition index (weapon ID for icon lookup).
 	for (int i = 0; i < 64; i++) {
 		if (!players[i].activeWeapon) continue;
 		DMADevice::PrepareEX(DMADevice::hScatter,

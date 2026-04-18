@@ -49,10 +49,6 @@ public:
 
 	void update();
 
-	void getMap();
-	void getLocalPlayer();
-	void getEntityList();
-	void getPlayers();
 	void getPlayerData();
 	void getWeapons();
 };

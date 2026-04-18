@@ -54,7 +54,7 @@ void gui::renderPlayers(const CGame& game) {
 
 	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
-		if (!p.controller || p.lifeState != 0 || p.ping == 0) continue;
+		if (!p.controller || p.lifeState != 0 || p.teamID < 2 || p.health == 0) continue;
 
 		float x     = p.position.x;
 		float y     = p.position.y;
