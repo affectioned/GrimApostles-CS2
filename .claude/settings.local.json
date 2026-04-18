@@ -1,7 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -I \"https://raw.githubusercontent.com/nicklvsa/cs2-items-go/main/icons/weapons/deagle.png\")",
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",

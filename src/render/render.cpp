@@ -7,9 +7,16 @@ static constexpr float PI = 3.14159265f;
 void gui::gameLoop(const CGame& game) {
 	std::string mapName = game.mapName;
 
-	// Resolve multi-level map variants by Z position
-	if (mapName == "de_nuke"    && game.localPlayer.position.z <= maps::nukeZBound)    mapName = "de_nuke_lower";
-	if (mapName == "de_vertigo" && game.localPlayer.position.z <= maps::vertigoZBound) mapName = "de_vertigo_lower";
+	// Resolve multi-level map variants dynamically from parsed overview bounds
+	auto boundsIt = maps::mapBounds.find(mapName);
+	if (boundsIt != maps::mapBounds.end()) {
+		float thresh = boundsIt->second.lowerZThreshold;
+		if (game.localPlayer.position.z <= thresh) {
+			std::string lower = mapName + "_lower";
+			if (maps::mapTextures.count(lower))
+				mapName = lower;
+		}
+	}
 
 	auto texIt = maps::mapTextures.find(mapName);
 	if (texIt == maps::mapTextures.end() || !texIt->second) return;
@@ -148,14 +155,10 @@ ImU32 gui::setColor(DWORD color, float opacity) {
 }
 
 float gui::setOpacity(float localZ, float entZ, const CGame& game) {
-	std::string mapName = game.mapName;
-	if (mapName == "de_nuke") {
-		if (localZ <  maps::nukeZBound && entZ >= maps::nukeZBound) return 155;
-		if (localZ >= maps::nukeZBound && entZ <  maps::nukeZBound) return 155;
-	}
-	if (mapName == "de_vertigo") {
-		if (localZ <  maps::vertigoZBound && entZ >= maps::vertigoZBound) return 155;
-		if (localZ >= maps::vertigoZBound && entZ <  maps::vertigoZBound) return 155;
-	}
+	auto it = maps::mapBounds.find(game.mapName);
+	if (it == maps::mapBounds.end()) return 255;
+	float thresh = it->second.lowerZThreshold;
+	if (thresh == std::numeric_limits<float>::infinity()) return 255;
+	if ((localZ <= thresh) != (entZ <= thresh)) return 155;
 	return 255;
 }

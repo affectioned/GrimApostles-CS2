@@ -9,9 +9,11 @@ public:
 	float xBound;
 	float yBound;
 	float scale;
+	float lowerZThreshold; // Z below which the _lower radar variant is shown; infinity = no lower level
 
-	mapData(float x, float y, float s) : xBound(x), yBound(y), scale(s) {}
-	mapData() : xBound(0.0f), yBound(0.0f), scale(0.0f) {}
+	mapData(float x, float y, float s, float zThresh = std::numeric_limits<float>::infinity())
+		: xBound(x), yBound(y), scale(s), lowerZThreshold(zThresh) {}
+	mapData() : xBound(0.0f), yBound(0.0f), scale(0.0f), lowerZThreshold(std::numeric_limits<float>::infinity()) {}
 };
 
 class CPlayer {

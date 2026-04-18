@@ -72,9 +72,9 @@ static const std::unordered_map<std::string, int> kWeaponIDs = {
 	{ "knife_kukri",         526 },
 };
 
-static float parseKVFloat(const std::string& content, const char* key) {
+static float parseKVFloat(const std::string& content, const char* key, size_t from = 0) {
 	std::string search = std::string("\"") + key + "\"";
-	auto pos = content.find(search);
+	auto pos = content.find(search, from);
 	if (pos == std::string::npos) return 0.0f;
 	pos = content.find('"', pos + search.size());
 	if (pos == std::string::npos) return 0.0f;
@@ -83,6 +83,17 @@ static float parseKVFloat(const std::string& content, const char* key) {
 	if (end == std::string::npos) return 0.0f;
 	try { return std::stof(content.substr(pos, end - pos)); }
 	catch (...) { return 0.0f; }
+}
+
+// Returns the Z threshold below which the _lower radar variant should be shown,
+// or infinity if the map has no vertical sections.
+static float parseLowerZThreshold(const std::string& content) {
+	auto vsPos = content.find("\"verticalsections\"");
+	if (vsPos == std::string::npos) return std::numeric_limits<float>::infinity();
+	auto defPos = content.find("\"default\"", vsPos);
+	if (defPos == std::string::npos) return std::numeric_limits<float>::infinity();
+	float v = parseKVFloat(content, "AltitudeMin", defPos);
+	return (v == 0.0f) ? std::numeric_limits<float>::infinity() : v;
 }
 
 void gui::loadMapBounds() {
@@ -102,21 +113,29 @@ void gui::loadMapBounds() {
 			if (!f) continue;
 			std::string content((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
 
-			float posX  = parseKVFloat(content, "pos_x");
-			float posY  = parseKVFloat(content, "pos_y");
-			float scale = parseKVFloat(content, "scale");
+			float posX   = parseKVFloat(content, "pos_x");
+			float posY   = parseKVFloat(content, "pos_y");
+			float scale  = parseKVFloat(content, "scale");
 			if (scale == 0.0f) continue;
 
-			maps::mapBounds[mapName] = mapData(posX, posY, scale);
+			float zThresh = parseLowerZThreshold(content);
+			maps::mapBounds[mapName] = mapData(posX, posY, scale, zThresh);
 			count++;
 		}
 	} catch (const fs::filesystem_error& e) {
 		std::cerr << "[Resources]: Could not scan maps folder: " << e.what() << "\n";
 	}
 
-	// Multi-level variants share the base map's bounds
-	if (maps::mapBounds.count("de_nuke"))    maps::mapBounds["de_nuke_lower"]    = maps::mapBounds["de_nuke"];
-	if (maps::mapBounds.count("de_vertigo")) maps::mapBounds["de_vertigo_lower"] = maps::mapBounds["de_vertigo"];
+	// Lower variants: same bounds as the base map but no further sub-level switching
+	for (auto& [name, data] : maps::mapBounds) {
+		if (data.lowerZThreshold == std::numeric_limits<float>::infinity()) continue;
+		std::string lowerName = name + "_lower";
+		if (!maps::mapBounds.count(lowerName)) {
+			mapData lower = data;
+			lower.lowerZThreshold = std::numeric_limits<float>::infinity();
+			maps::mapBounds[lowerName] = lower;
+		}
+	}
 
 	std::cout << "[Resources]: Loaded " << count << " map bounds\n";
 }

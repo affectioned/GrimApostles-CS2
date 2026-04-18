@@ -16,8 +16,6 @@ namespace gui {
 
 namespace maps {
 	float radarSize = 1080;
-	float vertigoZBound = 11700;
-	float nukeZBound = -495;
 	std::unordered_map<std::string, ID3D11ShaderResourceView*> mapTextures;
 	std::unordered_map<std::string, mapData> mapBounds;
 }
