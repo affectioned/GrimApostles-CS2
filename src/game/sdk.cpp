@@ -124,9 +124,16 @@ void CGame::getPlayerData() {
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::C_BaseEntity::m_iTeamNum,                    &players[i].teamID,       sizeof(uint8_t));
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iCompTeammateColor,   &players[i].color,        sizeof(DWORD));
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BaseEntity::m_iHealth,                    &players[i].health,       sizeof(uint32_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BaseEntity::m_lifeState,                  &players[i].lifeState,    sizeof(uint8_t));
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_angEyeAngles,             &players[i].eyeAngles,    sizeof(Vector2));
 		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BasePlayerPawn::m_vOldOrigin,             &players[i].position,     sizeof(Vector3));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_pClippingWeapon,          &players[i].activeWeapon, sizeof(uint64_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_pClippingWeapon,          &players[i].activeWeapon,    sizeof(uint64_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_bIsDefusing,              &players[i].isDefusing,      sizeof(bool));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_szLastPlaceName,          &players[i].lastPlaceName,   sizeof(players[i].lastPlaceName));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iPing,               &players[i].ping,         sizeof(uint32_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iPawnArmor,          &players[i].armor,        sizeof(int32_t));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_bPawnHasDefuser,     &players[i].hasDefuser,   sizeof(bool));
+		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_bPawnHasHelmet,      &players[i].hasHelmet,    sizeof(bool));
 	}
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);
@@ -138,8 +145,10 @@ void CGame::getPlayerData() {
 	DMADevice::ExecuteRead(DMADevice::hScatter);
 	DMADevice::Clear(DMADevice::hScatter);
 
-	for (int i = 0; i < 64; i++)
-		players[i].name[sizeof(players[i].name) - 1] = '\0';
+	for (int i = 0; i < 64; i++) {
+		players[i].name[sizeof(players[i].name) - 1]          = '\0';
+		players[i].lastPlaceName[sizeof(players[i].lastPlaceName) - 1] = '\0';
+	}
 }
 
 // ─── Weapons ─────────────────────────────────────────────────────────────────

@@ -23,12 +23,19 @@ public:
 	uint64_t pawn;
 	char     name[32];
 	uint8_t  teamID;
+	uint8_t  lifeState;
 	uint32_t health;
 	DWORD    color;
 	Vector2  eyeAngles;
 	Vector3  position;
 	uint64_t activeWeapon;
 	uint16_t activeWeaponID;
+	uint32_t ping;
+	int32_t  armor;
+	bool     hasHelmet;
+	bool     hasDefuser;
+	bool     isDefusing;
+	char     lastPlaceName[18];
 };
 
 class CGame {

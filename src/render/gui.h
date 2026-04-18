@@ -41,10 +41,9 @@ namespace gui {
 	ID3D11ShaderResourceView* LoadImageTexture(ID3D11Device* device, const wchar_t* filename, int* outWidth, int* outHeight);
 	LRESULT WINAPI WndProc(HWND, UINT, WPARAM, LPARAM);
 
-	// UI buttons (gui.cpp)
-	void ConnectButton();
-	void ExitButton();
-	void FpsOverlay();
+	// Control panel (gui.cpp)
+	void RenderControlPanel();
+	void RenderTeamPanels(const CGame&);
 
 	// Game rendering (render.cpp)
 	void gameLoop(const CGame&);
@@ -71,8 +70,18 @@ namespace maps {
 }
 
 namespace icons {
-	extern float scale;
 	extern std::unordered_map<int, ID3D11ShaderResourceView*> iconTextures;
 	extern std::unordered_map<int, int> iconWidths;
 	extern std::unordered_map<int, int> iconHeights;
+}
+
+namespace settings {
+	extern bool  showWeaponIcons;
+	extern bool  showPlayerNames;
+	extern bool  showHealthBars;
+	extern bool  showAimLines;
+	extern bool  showTeamPanels;
+	extern float iconScale;
+	extern float aimLineLength;
+	extern float dotRadius;
 }

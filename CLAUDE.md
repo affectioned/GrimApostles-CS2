@@ -32,13 +32,15 @@ Place alongside the `.exe` at runtime:
 5. `gui::RunLoop()` — main render loop (blocks until exit)
 
 ### Rendering pipeline
-- `render.cpp`: `gameLoop()` → `renderMap()` (draws map texture fullscreen) → `renderPlayers()` (dots, aim lines, weapon icons, health bars)
+- `render.cpp`: `gameLoop()` → `renderMap()` (draws map texture fullscreen) → `renderPlayers()` (dots + aim lines by default; weapon icons / health bars / names optional and off by default)
+- `renderPlayers()` also draws an orange ring around enemies who are actively defusing (`p.isDefusing`)
 - `worldToRadar()` converts CS2 world coordinates to radar pixel space using the per-map bounds/scale from `mapData`
 - Textures are loaded via `DirectX::CreateWICTextureFromFile` (WIC, from DirectXTK)
+- `gui.cpp`: `RenderTeamPanels()` draws the enemy player list (top-left). Each row: dot, name, HP bar, weapon icon, last place name, armor/helmet/defuser/ping. "DEFUSING" label (orange) replaces status indicators when active.
 
 ### Memory reading
 - `src/memory/dma.h/.cpp` — wraps MemProcFS (`vmmdll.h`) for all game memory reads
-- `src/game/sdk.h` — `CGame`, `CPlayer`, `CWeapon`, `mapData` structs
+- `src/game/sdk.h` — `CGame`, `CPlayer`, `mapData` structs
 - `src/game/sdk.cpp` — `CGame::update()` drives all per-frame memory reads
 - `src/game/offsets.h/.cpp` — all CS2 struct offsets; auto-updated at startup, hardcoded defaults as fallback
 - `src/game/updater.cpp` — fetches `client_dll.hpp` from a2x/cs2-dumper via WinINet (`fetchURL`), also does signature scanning via `sigscan.cpp`
@@ -46,7 +48,8 @@ Place alongside the `.exe` at runtime:
 ### Key namespaces (declared in `gui.h`)
 - `gui::` — all rendering, D3D lifecycle, resource loading
 - `maps::` — `mapTextures`, `mapBounds`, radar sizing constants
-- `icons::` — `iconTextures`, `iconWidths`, `iconHeights`, `scale`
+- `icons::` — `iconTextures`, `iconWidths`, `iconHeights`
+- `settings::` — runtime-configurable render options (`showWeaponIcons`, `showPlayerNames`, `showHealthBars`, `showAimLines`, `showTeamPanels`, `iconScale`, `aimLineLength`, `dotRadius`); defined with defaults in `gui.cpp`, exposed in the collapsible Settings panel of `RenderControlPanel()`. Radar-only overlays (weapon icons, names, health bars) default **off** since the enemy panel covers them; aim lines and team panels default on.
 
 ### Texture loading
 `LoadImageTexture()` in `dx11.cpp` — two overloads, one optionally outputs pixel dimensions. Used exclusively in `resources.cpp`.

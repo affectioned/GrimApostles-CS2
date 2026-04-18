@@ -21,8 +21,9 @@ namespace matchmaking_dll {
 
 namespace client_dll {
 	namespace C_BaseEntity {
-		std::ptrdiff_t m_iTeamNum = 0x3F3;
-		std::ptrdiff_t m_iHealth  = 0x354;
+		std::ptrdiff_t m_iTeamNum  = 0x3F3;
+		std::ptrdiff_t m_iHealth   = 0x354;
+		std::ptrdiff_t m_lifeState = 0x35C;
 	}
 
 	namespace C_BasePlayerPawn {
@@ -33,11 +34,17 @@ namespace client_dll {
 		std::ptrdiff_t m_hPlayerPawn          = 0x90C;
 		std::ptrdiff_t m_sSanitizedPlayerName = 0x860;
 		std::ptrdiff_t m_iCompTeammateColor   = 0x848;
+		std::ptrdiff_t m_iPing                = 0x828;
+		std::ptrdiff_t m_iPawnArmor           = 0x91C;
+		std::ptrdiff_t m_bPawnHasDefuser      = 0x920;
+		std::ptrdiff_t m_bPawnHasHelmet       = 0x921;
 	}
 
 	namespace C_CSPlayerPawn {
 		std::ptrdiff_t m_angEyeAngles    = 0x3DD0;
 		std::ptrdiff_t m_pClippingWeapon = 0x3DC0;
+		std::ptrdiff_t m_bIsDefusing     = 0x26FA;
+		std::ptrdiff_t m_szLastPlaceName = 0x16A4;
 	}
 
 	namespace C_EconEntity {

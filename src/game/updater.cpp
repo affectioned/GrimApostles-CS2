@@ -64,12 +64,19 @@ bool updater::fetchClassOffsets() {
 
 	assign(client_dll::C_BaseEntity::m_iTeamNum,                    "C_BaseEntity",             "m_iTeamNum");
 	assign(client_dll::C_BaseEntity::m_iHealth,                     "C_BaseEntity",             "m_iHealth");
+	assign(client_dll::C_BaseEntity::m_lifeState,                   "C_BaseEntity",             "m_lifeState");
 	assign(client_dll::C_BasePlayerPawn::m_vOldOrigin,              "C_BasePlayerPawn",         "m_vOldOrigin");
 	assign(client_dll::CCSPlayerController::m_hPlayerPawn,          "CCSPlayerController",      "m_hPlayerPawn");
 	assign(client_dll::CCSPlayerController::m_sSanitizedPlayerName, "CCSPlayerController",      "m_sSanitizedPlayerName");
 	assign(client_dll::CCSPlayerController::m_iCompTeammateColor,   "CCSPlayerController",      "m_iCompTeammateColor");
+	assign(client_dll::CCSPlayerController::m_iPing,                "CCSPlayerController",      "m_iPing");
+	assign(client_dll::CCSPlayerController::m_iPawnArmor,           "CCSPlayerController",      "m_iPawnArmor");
+	assign(client_dll::CCSPlayerController::m_bPawnHasDefuser,      "CCSPlayerController",      "m_bPawnHasDefuser");
+	assign(client_dll::CCSPlayerController::m_bPawnHasHelmet,       "CCSPlayerController",      "m_bPawnHasHelmet");
 	assign(client_dll::C_CSPlayerPawn::m_angEyeAngles,              "C_CSPlayerPawn",           "m_angEyeAngles");
 	assign(client_dll::C_CSPlayerPawn::m_pClippingWeapon,           "C_CSPlayerPawn",           "m_pClippingWeapon");
+	assign(client_dll::C_CSPlayerPawn::m_bIsDefusing,               "C_CSPlayerPawn",           "m_bIsDefusing");
+	assign(client_dll::C_CSPlayerPawn::m_szLastPlaceName,           "C_CSPlayerPawn",           "m_szLastPlaceName");
 	assign(client_dll::C_EconEntity::m_AttributeManager,            "C_EconEntity",             "m_AttributeManager");
 	assign(client_dll::C_AttributeContainer::m_Item,                "C_AttributeContainer",     "m_Item");
 	assign(client_dll::C_EconItemView::m_iItemDefinitionIndex,      "C_EconItemView",           "m_iItemDefinitionIndex");
@@ -77,7 +84,7 @@ bool updater::fetchClassOffsets() {
 	// subsequently acquire-loads classOffsetsReady.
 	classOffsetsReady.store(true, std::memory_order_release);
 
-	std::cout << "[Updater]: " << updated << "/11 class offsets updated." << std::endl;
+	std::cout << "[Updater]: " << updated << "/18 class offsets updated." << std::endl;
 	return updated > 0;
 }
 

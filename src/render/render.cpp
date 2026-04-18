@@ -40,15 +40,14 @@ void gui::renderMap(ID3D11ShaderResourceView* texture) {
 	ImGui::PopStyleVar(2);
 }
 
-// Single pass over all players: aim line -> weapon icon (enemies only) -> dot -> health bar
+// Single pass over all players: aim line -> dot (+ defuse ring) -> [optional: weapon icon / health bar / name]
 void gui::renderPlayers(const CGame& game) {
-	ImVec2      windowPos  = ImGui::GetWindowPos();
-	const float aimLength  = 40.0f;
-	const float localZ     = game.localPlayer.position.z;
+	ImVec2      windowPos = ImGui::GetWindowPos();
+	const float localZ    = game.localPlayer.position.z;
 
 	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
-		if (!p.controller || !p.health) continue;
+		if (!p.controller || p.lifeState != 0) continue;
 
 		float x     = p.position.x;
 		float y     = p.position.y;
@@ -60,18 +59,20 @@ void gui::renderPlayers(const CGame& game) {
 		ImVec2 pos     = ImVec2(windowPos.x + x, windowPos.y + y);
 
 		// Aim line
-		ImVec2 endpoint = ImVec2(pos.x + aimLength * cos(angle) + 1.0f,
-		                         pos.y + aimLength * sin(angle) * -1.0f + 1.0f);
-		ImGui::GetForegroundDrawList()->AddLine(pos, endpoint, IM_COL32(0,   0,   0,   (int)opacity), 6.5f);
-		ImGui::GetForegroundDrawList()->AddLine(pos, endpoint, IM_COL32(255, 255, 255, (int)opacity), 4.0f);
+		if (settings::showAimLines) {
+			ImVec2 endpoint = ImVec2(pos.x + settings::aimLineLength * cos(angle) + 1.0f,
+			                         pos.y + settings::aimLineLength * sin(angle) * -1.0f + 1.0f);
+			ImGui::GetForegroundDrawList()->AddLine(pos, endpoint, IM_COL32(0,   0,   0,   (int)opacity), 6.5f);
+			ImGui::GetForegroundDrawList()->AddLine(pos, endpoint, IM_COL32(255, 255, 255, (int)opacity), 4.0f);
+		}
 
 		// Weapon icon -- enemies only
-		if (p.teamID != game.localPlayer.teamID) {
+		if (settings::showWeaponIcons && p.teamID != game.localPlayer.teamID) {
 			int weaponID = p.activeWeaponID;
 			auto texIt = icons::iconTextures.find(weaponID);
 			if (texIt != icons::iconTextures.end() && texIt->second) {
-				float  iconW   = (float)icons::iconWidths[weaponID]  * icons::scale;
-				float  iconH   = (float)icons::iconHeights[weaponID] * icons::scale;
+				float  iconW   = (float)icons::iconWidths[weaponID]  * settings::iconScale;
+				float  iconH   = (float)icons::iconHeights[weaponID] * settings::iconScale;
 				ImVec2 iconPos = (angle >= 0 && angle <= PI)
 					? ImVec2(pos.x - iconW / 2, pos.y + 20.f)
 					: ImVec2(pos.x - iconW / 2, pos.y - 20.f - iconH);
@@ -90,11 +91,15 @@ void gui::renderPlayers(const CGame& game) {
 		else if (p.teamID     == game.localPlayer.teamID)     dotColor = setColor(p.color, opacity);
 		else                                                   dotColor = IM_COL32(255, 9, 9, (int)opacity);
 
-		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, 9.25f, IM_COL32(0, 0, 0, 255));
-		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, 8.0f,  dotColor);
+		// Defusing ring -- orange circle around the dot, enemies only
+		if (p.isDefusing && p.teamID != game.localPlayer.teamID)
+			ImGui::GetForegroundDrawList()->AddCircle(pos, settings::dotRadius + 3.5f, IM_COL32(255, 150, 20, (int)opacity), 0, 2.0f);
+
+		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, settings::dotRadius + 1.25f, IM_COL32(0, 0, 0, 255));
+		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, settings::dotRadius,         dotColor);
 
 		// Health bar -- enemies only, vertical bar on the left side of the dot
-		if (p.teamID != game.localPlayer.teamID) {
+		if (settings::showHealthBars && p.teamID != game.localPlayer.teamID) {
 			constexpr float barW = 3.0f, barH = 18.0f, barX = 14.0f;
 			float filled = (float)p.health / 100.0f;
 			float r = 255.0f * (1.0f - filled);
@@ -107,9 +112,9 @@ void gui::renderPlayers(const CGame& game) {
 		}
 
 		// Player name below dot -- skip local player
-		if (p.controller != game.localPlayer.controller && p.name[0]) {
+		if (settings::showPlayerNames && p.controller != game.localPlayer.controller && p.name[0]) {
 			ImVec2 textSize = ImGui::CalcTextSize(p.name);
-			ImVec2 namePos  = ImVec2(pos.x - textSize.x * 0.5f, pos.y + 12.f);
+			ImVec2 namePos  = ImVec2(pos.x - textSize.x * 0.5f, pos.y + settings::dotRadius + 4.0f);
 			ImGui::GetForegroundDrawList()->AddText(ImVec2(namePos.x + 1, namePos.y + 1), IM_COL32(0,   0,   0,   (int)opacity), p.name);
 			ImGui::GetForegroundDrawList()->AddText(namePos,                               IM_COL32(255, 255, 255, (int)opacity), p.name);
 		}
