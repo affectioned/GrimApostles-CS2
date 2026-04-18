@@ -35,7 +35,8 @@ struct CPlayer {
 
 // ── Game ──────────────────────────────────────────────────────────────────────
 
-struct CGame {
+class CGame {
+public:
 	CPlayer      localPlayer;
 	char         mapName[32] = {};
 	uintptr_t    entityList  = 0;
