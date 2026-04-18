@@ -54,8 +54,11 @@ run.bat --out C:\path\to\bin\Release\textures --icon-size 256 -v
 textures/
   maps/
     de_dust2_radar.png
+    de_dust2_radar.txt    ← map bounds (pos_x, pos_y, scale)
     de_nuke_radar.png
-    de_nuke_lower_radar.png
+    de_nuke_radar.txt
+    ar_shoots_radar.png
+    ar_shoots_radar.txt
     ...
   icons/
     ak47.png
@@ -64,14 +67,15 @@ textures/
     ...
 ```
 
-Place the `textures/` folder alongside `GrimApostles CS2.exe` at runtime. The radar overlay loads every `.png` in `textures/icons/` whose filename matches a known weapon — new icons are picked up automatically without any code changes.
+Place the `textures/` folder alongside `GrimApostles CS2.exe` at runtime. The radar overlay loads all maps and icons automatically — no code changes needed when new maps or weapons are added, just re-run the extractor.
 
 ## How it works
 
-1. Passes `game/csgo/pak01_dir.vpk` directly to VRF CLI, which reads and decompiles assets in one step. (The `vpk` Python library is only used for `--list` mode.)
+1. Passes `game/csgo/pak01_dir.vpk` directly to VRF CLI, which reads and decompiles assets in one step.
 2. Extracts all `.vtex_c` radar textures from `panorama/images/overheadmaps/`; VRF outputs `.png` files.
 3. Normalises filenames to `<mapname>_radar.png` (e.g. `de_dust2_radar_psd.png` → `de_dust2_radar.png`). All map variants are included — arena maps, night versions, etc.
-4. Extracts `.vsvg_c` weapon icon SVGs from the equipment icons path and converts them to PNGs using `svglib`: renders white silhouettes onto black, then promotes luminance to alpha so icons are white-on-transparent.
+4. Extracts overview bounds from `resource/overviews/*.txt` inside the VPK (via the `vpk` Python library — these files are not on the filesystem). Renames them to `<mapname>_radar.txt`. The C++ side parses `pos_x`/`pos_y`/`scale` from these at startup to position players correctly on the radar — no hardcoded bounds.
+5. Extracts `.vsvg_c` weapon icon SVGs from the equipment icons path and converts them to PNGs using `svglib`: renders white silhouettes onto black, then promotes luminance to alpha so icons are white-on-transparent.
 
 ## Adding to the Visual Studio solution
 
