@@ -60,6 +60,9 @@ Both maps and icons are loaded by scanning their folders at startup via `std::fi
 - **Icons**: scans `textures/icons/` for `.png` files whose stem matches a key in the static `kWeaponIDs` table in `resources.cpp`. To add a new weapon, add its name→ID entry there — do not add `loadDim()` calls.
 - `<filesystem>` is included in `pch.h`.
 
+### Settings persistence
+Settings are saved/loaded via ImGui's built-in `.ini` system using a registered `ImGuiSettingsHandler` (in `InitImGui()`, `gui.cpp`). File is `GrimApostles.ini` next to the `.exe`. Loads automatically on first `NewFrame()`, saves on `DestroyContext()`. To add a new setting: add a line to both `ReadLineFn` and `WriteAllFn` — no new files or explicit save calls needed. `ImGuiSettingsHandler` and `ImHashStr` come from `imgui_internal.h` (already included).
+
 ### WinINet is already linked
 `updater.cpp` and `dx11.cpp` both `#pragma comment(lib, "wininet")`. Any new HTTP fetching can reuse the existing `fetchURL()` static helper in `updater.cpp`.
 
