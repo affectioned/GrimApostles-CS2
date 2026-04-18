@@ -96,6 +96,7 @@ void CGame::update() {
 
 	getPlayerData();
 	getWeapons();
+	getCarrier();
 	getBombData(plantedC4Ptr);
 }
 
@@ -148,6 +149,97 @@ void CGame::getPlayerData() {
 	for (int i = 0; i < 64; i++) {
 		players[i].ctrl.name[sizeof(players[i].ctrl.name) - 1]                  = '\0';
 		players[i].pawn.lastPlaceName[sizeof(players[i].pawn.lastPlaceName) - 1] = '\0';
+	}
+}
+
+// ─── getCarrier ───────────────────────────────────────────────────────────────
+
+void CGame::getCarrier() {
+	static constexpr int kSlots = 8;
+
+	// Pass 1: weapon list data pointer for each alive player
+	static uint64_t weaponListPtrs[64];
+	memset(weaponListPtrs, 0, sizeof(weaponListPtrs));
+
+	for (int i = 0; i < 64; i++) {
+		if (!players[i].pawnBase || players[i].pawn.lifeState != 0) continue;
+		if (!isValidPtr(players[i].pawn.weaponServicesPtr)) continue;
+		g_DMA.PrepareEX(players[i].pawn.weaponServicesPtr + client_dll::CPlayer_WeaponServices::m_hMyWeapons,
+		                &weaponListPtrs[i], sizeof(uint64_t));
+	}
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	// Pass 2: first kSlots weapon handles per player (each handle is uint32_t)
+	static uint32_t weaponHandles[64][kSlots];
+	memset(weaponHandles, 0, sizeof(weaponHandles));
+
+	for (int i = 0; i < 64; i++) {
+		if (!isValidPtr(weaponListPtrs[i])) continue;
+		g_DMA.PrepareEX(weaponListPtrs[i], weaponHandles[i], kSlots * sizeof(uint32_t));
+	}
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	// Pass 3: resolve listEntry chunk for each valid handle
+	static uint64_t weaponListEntries[64][kSlots];
+	memset(weaponListEntries, 0, sizeof(weaponListEntries));
+
+	for (int i = 0; i < 64; i++) {
+		for (int j = 0; j < kSlots; j++) {
+			uint32_t h = weaponHandles[i][j];
+			if (!h || h == 0xFFFFFFFF) continue;
+			g_DMA.PrepareEX(entityList + 0x8 * ((h & 0x7FFF) >> 9) + 16,
+			                &weaponListEntries[i][j], sizeof(uint64_t));
+		}
+	}
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	// Pass 4: resolve weapon entity pointer from listEntry + slot
+	static uint64_t weaponEntityPtrs[64][kSlots];
+	memset(weaponEntityPtrs, 0, sizeof(weaponEntityPtrs));
+
+	for (int i = 0; i < 64; i++) {
+		for (int j = 0; j < kSlots; j++) {
+			uint32_t h = weaponHandles[i][j];
+			if (!h || h == 0xFFFFFFFF || !isValidPtr(weaponListEntries[i][j])) continue;
+			g_DMA.PrepareEX(weaponListEntries[i][j] + 0x70 * (h & 0x1FF),
+			                &weaponEntityPtrs[i][j], sizeof(uint64_t));
+		}
+	}
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	// Pass 5: read item definition index for each weapon entity
+	static uint16_t weaponDefIds[64][kSlots];
+	memset(weaponDefIds, 0, sizeof(weaponDefIds));
+
+	for (int i = 0; i < 64; i++) {
+		for (int j = 0; j < kSlots; j++) {
+			if (!isValidPtr(weaponEntityPtrs[i][j])) continue;
+			uint64_t itemAddr = weaponEntityPtrs[i][j]
+				+ client_dll::C_EconEntity::m_AttributeManager
+				+ client_dll::C_AttributeContainer::m_Item
+				+ client_dll::C_EconItemView::m_iItemDefinitionIndex;
+			g_DMA.PrepareEX(itemAddr, &weaponDefIds[i][j], sizeof(uint16_t));
+		}
+	}
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	// Find first alive player carrying the C4 (item def 49)
+	bomb.isCarried   = false;
+	bomb.carrierSlot = -1;
+	for (int i = 0; i < 64; i++) {
+		if (!players[i].controllerBase || players[i].pawn.lifeState != 0) continue;
+		for (int j = 0; j < kSlots; j++) {
+			if (weaponDefIds[i][j] == 49) {
+				bomb.isCarried   = true;
+				bomb.carrierSlot = i;
+				return;
+			}
+		}
 	}
 }
 

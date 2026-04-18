@@ -9,6 +9,7 @@ void C_CSPlayerPawn::Read(uint64_t base) {
 	g_DMA.PrepareEX(base + client_dll::C_CSPlayerPawn::m_angEyeAngles,    &eyeAngles,     sizeof(eyeAngles));
 	g_DMA.PrepareEX(base + client_dll::C_BasePlayerPawn::m_vOldOrigin,    &position,      sizeof(position));
 	g_DMA.PrepareEX(base + client_dll::C_CSPlayerPawn::m_pClippingWeapon, &activeWeapon,  sizeof(activeWeapon));
-	g_DMA.PrepareEX(base + client_dll::C_CSPlayerPawn::m_bIsDefusing,     &isDefusing,    sizeof(isDefusing));
-	g_DMA.PrepareEX(base + client_dll::C_CSPlayerPawn::m_szLastPlaceName, &lastPlaceName, sizeof(lastPlaceName));
+	g_DMA.PrepareEX(base + client_dll::C_CSPlayerPawn::m_bIsDefusing,         &isDefusing,          sizeof(isDefusing));
+	g_DMA.PrepareEX(base + client_dll::C_CSPlayerPawn::m_szLastPlaceName,     &lastPlaceName,       sizeof(lastPlaceName));
+	g_DMA.PrepareEX(base + client_dll::C_BasePlayerPawn::m_pWeaponServices,   &weaponServicesPtr,   sizeof(weaponServicesPtr));
 }

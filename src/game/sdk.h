@@ -49,5 +49,6 @@ private:
 	void resolveEntityChain();
 	void getPlayerData();
 	void getWeapons();
+	void getCarrier();
 	void getBombData(uint64_t c4);
 };

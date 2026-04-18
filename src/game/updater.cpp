@@ -73,6 +73,8 @@ bool updater::fetchClassOffsets() {
 	assign(client_dll::CCSPlayerController::m_iPawnArmor,           "CCSPlayerController",      "m_iPawnArmor");
 	assign(client_dll::CCSPlayerController::m_bPawnHasDefuser,      "CCSPlayerController",      "m_bPawnHasDefuser");
 	assign(client_dll::CCSPlayerController::m_bPawnHasHelmet,       "CCSPlayerController",      "m_bPawnHasHelmet");
+	assign(client_dll::C_BasePlayerPawn::m_pWeaponServices,         "C_BasePlayerPawn",         "m_pWeaponServices");
+	assign(client_dll::CPlayer_WeaponServices::m_hMyWeapons,        "CPlayer_WeaponServices",   "m_hMyWeapons");
 	assign(client_dll::C_CSPlayerPawn::m_angEyeAngles,              "C_CSPlayerPawn",           "m_angEyeAngles");
 	assign(client_dll::C_CSPlayerPawn::m_pClippingWeapon,           "C_CSPlayerPawn",           "m_pClippingWeapon");
 	assign(client_dll::C_CSPlayerPawn::m_bIsDefusing,               "C_CSPlayerPawn",           "m_bIsDefusing");
@@ -91,7 +93,7 @@ bool updater::fetchClassOffsets() {
 	// subsequently acquire-loads classOffsetsReady.
 	classOffsetsReady.store(true, std::memory_order_release);
 
-	std::cout << "[Updater]: " << updated << "/25 class offsets updated." << std::endl;
+	std::cout << "[Updater]: " << updated << "/27 class offsets updated." << std::endl;
 	return updated > 0;
 }
 

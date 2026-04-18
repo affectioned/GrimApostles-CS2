@@ -53,6 +53,14 @@ namespace client_dll {
 		extern std::ptrdiff_t m_bPawnHasHelmet;         // bool
 	}
 
+	namespace C_BasePlayerPawn {
+		extern std::ptrdiff_t m_pWeaponServices; // CPlayer_WeaponServices*
+	}
+
+	namespace CPlayer_WeaponServices {
+		extern std::ptrdiff_t m_hMyWeapons; // CNetworkUtlVectorBase<CHandle<C_BaseCombatWeapon>>
+	}
+
 	namespace C_CSPlayerPawn {
 		extern std::ptrdiff_t m_angEyeAngles;    // Vector2
 		extern std::ptrdiff_t m_pClippingWeapon; // CHandle<C_WeaponBase>

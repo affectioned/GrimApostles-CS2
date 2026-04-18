@@ -7,7 +7,8 @@
       "Bash(curl -s https://pypi.org/pypi/vpk/json)",
       "WebFetch(domain:pypi.org)",
       "WebFetch(domain:s2v.app)",
-      "Skill(claude-md-management:revise-claude-md)"
+      "Skill(claude-md-management:revise-claude-md)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/client_dll.hpp\")"
     ]
   }
 }

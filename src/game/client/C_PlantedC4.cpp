@@ -6,25 +6,17 @@ static bool isValidPtr(uint64_t p) {
 }
 
 void CGame::getBombData(uint64_t c4) {
-	// Carrier: whoever holds weapon ID 49 (C4) and is alive
-	bomb.isCarried   = false;
-	bomb.carrierSlot = -1;
-	for (int i = 0; i < 64; i++) {
-		if (players[i].pawn.lifeState == 0 && players[i].pawn.activeWeaponID == 49) {
-			bomb.isCarried   = true;
-			bomb.carrierSlot = i;
-			break;
-		}
-	}
-
 	if (!c4) {
-		if (bomb.entity) {
-			bomb.entity         = 0;
-			bomb.sceneNode      = 0;
-			bomb.isTicking      = false;
-			bomb.isBeingDefused = false;
-			bomb.plantTimeSet   = false;
-		}
+		// Reset all bomb state — clears stale terminal flags (hasDefused/hasExploded)
+		// so they don't bleed into the next round when someone picks up the C4.
+		bomb.entity         = 0;
+		bomb.sceneNode      = 0;
+		bomb.position       = {};
+		bomb.isTicking      = false;
+		bomb.isBeingDefused = false;
+		bomb.hasExploded    = false;
+		bomb.hasDefused     = false;
+		bomb.plantTimeSet   = false;
 		return;
 	}
 
