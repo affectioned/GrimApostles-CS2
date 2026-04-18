@@ -7,10 +7,13 @@
     <Filter Include="src\game">
       <UniqueIdentifier>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\memory">
+    <Filter Include="src\game\client">
+      <UniqueIdentifier>{A8B9C0D1-E2F3-4567-89AB-CDEF01234567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src\tier0">
       <UniqueIdentifier>{B2C3D4E5-F6A7-8901-BCDE-F12345678901}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src\render">
+    <Filter Include="src\vgui">
       <UniqueIdentifier>{C3D4E5F6-A7B8-9012-CDEF-123456789012}</UniqueIdentifier>
     </Filter>
     <Filter Include="vendor">
@@ -39,26 +42,35 @@
     <ClCompile Include="src\game\offsets.cpp">
       <Filter>src\game</Filter>
     </ClCompile>
-    <ClCompile Include="src\memory\sigscan.cpp">
-      <Filter>src\memory</Filter>
-    </ClCompile>
-    <ClCompile Include="src\memory\dma.cpp">
-      <Filter>src\memory</Filter>
-    </ClCompile>
     <ClCompile Include="src\game\updater.cpp">
       <Filter>src\game</Filter>
     </ClCompile>
-    <ClCompile Include="src\render\gui.cpp">
-      <Filter>src\render</Filter>
+    <ClCompile Include="src\game\client\C_PlantedC4.cpp">
+      <Filter>src\game\client</Filter>
     </ClCompile>
-    <ClCompile Include="src\render\render.cpp">
-      <Filter>src\render</Filter>
+    <ClCompile Include="src\game\client\CCSPlayerController.cpp">
+      <Filter>src\game\client</Filter>
     </ClCompile>
-    <ClCompile Include="src\render\dx11.cpp">
-      <Filter>src\render</Filter>
+    <ClCompile Include="src\game\client\C_CSPlayerPawn.cpp">
+      <Filter>src\game\client</Filter>
     </ClCompile>
-    <ClCompile Include="src\render\resources.cpp">
-      <Filter>src\render</Filter>
+    <ClCompile Include="src\tier0\sigscan.cpp">
+      <Filter>src\tier0</Filter>
+    </ClCompile>
+    <ClCompile Include="src\tier0\dma.cpp">
+      <Filter>src\tier0</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vgui\gui.cpp">
+      <Filter>src\vgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vgui\render.cpp">
+      <Filter>src\vgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vgui\dx11.cpp">
+      <Filter>src\vgui</Filter>
+    </ClCompile>
+    <ClCompile Include="src\vgui\resources.cpp">
+      <Filter>src\vgui</Filter>
     </ClCompile>
     <ClCompile Include="vendor\imgui\imgui.cpp">
       <Filter>vendor\imgui</Filter>
@@ -92,20 +104,29 @@
     <ClInclude Include="src\game\offsets.h">
       <Filter>src\game</Filter>
     </ClInclude>
-    <ClInclude Include="src\memory\sigscan.h">
-      <Filter>src\memory</Filter>
-    </ClInclude>
     <ClInclude Include="src\game\vec.h">
       <Filter>src\game</Filter>
-    </ClInclude>
-    <ClInclude Include="src\memory\dma.h">
-      <Filter>src\memory</Filter>
     </ClInclude>
     <ClInclude Include="src\game\updater.h">
       <Filter>src\game</Filter>
     </ClInclude>
-    <ClInclude Include="src\render\gui.h">
-      <Filter>src\render</Filter>
+    <ClInclude Include="src\game\client\CCSPlayerController.h">
+      <Filter>src\game\client</Filter>
+    </ClInclude>
+    <ClInclude Include="src\game\client\C_CSPlayerPawn.h">
+      <Filter>src\game\client</Filter>
+    </ClInclude>
+    <ClInclude Include="src\game\client\C_PlantedC4.h">
+      <Filter>src\game\client</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tier0\sigscan.h">
+      <Filter>src\tier0</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tier0\dma.h">
+      <Filter>src\tier0</Filter>
+    </ClInclude>
+    <ClInclude Include="src\vgui\gui.h">
+      <Filter>src\vgui</Filter>
     </ClInclude>
     <ClInclude Include="vendor\dx\WICTextureLoader.h">
       <Filter>vendor\dx</Filter>
@@ -140,5 +161,26 @@
     <ClInclude Include="vendor\vmm\vmmdll.h">
       <Filter>vendor\vmm</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="vendor\dx\DirectXTK.lib" />
+    <Library Include="vendor\vmm\leechcore.lib" />
+    <Library Include="vendor\vmm\vmm.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="tools\AssetExtractor\extract.py" />
+    <None Include="tools\AssetExtractor\README.md" />
+    <None Include=".gitignore" />
+    <None Include="CLAUDE.md" />
+    <None Include="README.md" />
+    <None Include="tools\AssetExtractor\run.bat" />
+    <None Include="tools\AssetExtractor\vrf\blake3_dotnet.dll" />
+    <None Include="tools\AssetExtractor\vrf\libSkiaSharp.dll" />
+    <None Include="tools\AssetExtractor\vrf\Source2Viewer-CLI.exe" />
+    <None Include="tools\AssetExtractor\vrf\spirv-cross.dll" />
+    <None Include="tools\AssetExtractor\vrf\TinyEXRNative.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="tools\AssetExtractor\requirements.txt" />
   </ItemGroup>
 </Project>

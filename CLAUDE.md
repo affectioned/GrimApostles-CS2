@@ -31,36 +31,60 @@ Place alongside the `.exe` at runtime:
 4. `updater::fetchClassOffsets()` — background thread fetches `client_dll.hpp` from a2x/cs2-dumper, falls back to hardcoded defaults in `src/game/offsets.cpp`
 5. `gui::RunLoop()` — main render loop (blocks until exit)
 
+### Source layout
+Follows Valve Source 2 folder naming conventions:
+- `src/tier0/` — platform layer: `dma.h/.cpp` (MemProcFS wrapper), `sigscan.h/.cpp`
+- `src/game/` — game state: `sdk.h/.cpp` (`CGame`, `CPlayer`, `mapData`), `offsets.h/.cpp`, `updater.h/.cpp`
+- `src/game/client/` — CS2 client entity mirrors (one `.h`+`.cpp` per class, named after the CS2 class):
+  - `CCSPlayerController.h/.cpp` — controller fields + `prepRead(base)`
+  - `C_CSPlayerPawn.h/.cpp` — pawn fields + `prepRead(base)`
+  - `C_PlantedC4.h/.cpp` — planted bomb struct + `CGame::getBombData()`
+- `src/vgui/` — rendering/UI: `gui.h/.cpp`, `render.cpp`, `dx11.cpp`, `resources.cpp`
+
+**Coding convention:** file names and struct names match CS2's actual class names exactly. Folder names follow Source 2 conventions (`tier0`, `vgui`, `game/client`). Always follow this pattern when adding new classes.
+
 ### Rendering pipeline
-- `render.cpp`: `gameLoop()` → `renderMap()` (draws map texture fullscreen) → `renderPlayers()` (dots + aim lines by default; weapon icons / health bars / names optional and off by default)
-- `renderPlayers()` also draws an orange ring around enemies who are actively defusing (`p.isDefusing`)
+- `src/vgui/render.cpp`: `gameLoop()` → `renderMap()` → `renderPlayers()` → `renderBomb()`
+- `renderPlayers()` draws an orange ring around enemies who are actively defusing (`p.pawn.isDefusing`)
+- `renderBomb()` draws: yellow carrier halo on C4 holder, yellow dot for planted bomb, cyan defuse ring
+- `src/vgui/gui.cpp`: `RenderTeamPanels()` (enemy list, top-left), `RenderBombPanel()` (bottom-left: carrier/planted/timer/defusing states)
 - `worldToRadar()` converts CS2 world coordinates to radar pixel space using the per-map bounds/scale from `mapData`
 - Textures are loaded via `DirectX::CreateWICTextureFromFile` (WIC, from DirectXTK)
-- `gui.cpp`: `RenderTeamPanels()` draws the enemy player list (top-left). Each row: dot, name, HP bar, weapon icon, last place name, armor/helmet/defuser/ping. "DEFUSING" label (orange) replaces status indicators when active.
+
+### Key namespaces (declared in `src/vgui/gui.h`)
+- `gui::` — all rendering, D3D lifecycle, resource loading
+- `maps::` — `mapTextures`, `mapBounds`, radar sizing constants
+- `icons::` — `iconTextures`, `iconWidths`, `iconHeights`
+- `settings::` — runtime-configurable render options (`showWeaponIcons`, `showPlayerNames`, `showHealthBars`, `showAimLines`, `showTeamPanels`, `iconScale`, `aimLineLength`, `dotRadius`); defined with defaults in `gui.cpp`, exposed in the collapsible Settings panel of `RenderControlPanel()`. Radar-only overlays (weapon icons, names, health bars) default **off** since the enemy panel covers them; aim lines and team panels default on.
+
+### CPlayer structure
+`CPlayer` composes two sub-structs matching CS2's class hierarchy:
+- `p.ctrl` — `CCSPlayerController`: `teamID`, `color`, `ping`, `armor`, `hasDefuser`, `hasHelmet`, `name`, `nameAddr`
+- `p.pawn` — `C_CSPlayerPawn`: `health`, `lifeState`, `position`, `eyeAngles`, `activeWeapon`, `activeWeaponID`, `isDefusing`, `lastPlaceName`
+- `p.controllerBase`, `p.pawnBase` — DMA chain pointers
+
+Valid player filter: `p.controllerBase && p.pawn.lifeState == 0 && p.ctrl.teamID >= 2 && p.pawn.health > 0`
+
+### Bomb tracking (`C_PlantedC4`)
+`CGame::bomb` is a `C_PlantedC4`. Key fields: `entity`, `position`, `isTicking`, `isBeingDefused`, `hasExploded`, `hasDefused`, `site` (0=A, 1=B), `isCarried`, `carrierSlot`. Timer is wall-clock (`std::chrono::steady_clock`) latched when `isTicking` first goes true — `timeRemaining()` counts 40s from that point. `dwPlantedC4` is sigscan-only (no hardcoded fallback); pattern in `updater::sigscanOffsets()`.
 
 ### Memory reading
-- `src/memory/dma.h/.cpp` — wraps MemProcFS (`vmmdll.h`) for all game memory reads
+- `src/tier0/dma.h/.cpp` — wraps MemProcFS (`vmmdll.h`) for all game memory reads
 - `src/game/sdk.h` — `CGame`, `CPlayer`, `mapData` structs
-- `src/game/sdk.cpp` — `CGame::update()` drives all per-frame memory reads
+- `src/game/sdk.cpp` — `CGame::update()` drives all per-frame memory reads; also contains `getPlayerData()` and `getWeapons()`
 - `src/game/offsets.h/.cpp` — all CS2 struct offsets; auto-updated at startup, hardcoded defaults as fallback
 - `src/game/updater.cpp` — fetches `client_dll.hpp` from a2x/cs2-dumper via WinINet (`fetchURL`), also does signature scanning via `sigscan.cpp`
 
 ### DMA reliability and read batching
 The FPGA hardware runs at ~200MB/s; PCIe round-trip latency matters more than bandwidth. Guidelines:
 - **Never use individual `MemReadPtr`/`MemRead` calls in `update()`** — always batch into `PrepareEX` + `ExecuteRead` scatter passes.
-- `update()` is structured as three scatter batches before the entity chain: **Scatter A** (4 module-level offsets), **Scatter B** (one level deep: mapPtr + local player fields + 64 entity chunk pointers), **Scatter C** (mapName + local player name strings).
-- Entity chain passes 2–5 are **guarded** (`if (players[i].listEntry)` etc.) so empty slots don't generate reads.
-- `VMMDLL_FLAG_ZEROPAD_ON_FAIL` handles complete read failures (returns zeros) but not partial/corrupted reads. `sdk.cpp` has `isValidPtr()` and `isValidAscii()` helpers for validation, and `update()` keeps a `prev[64]` snapshot to restore slots where reads return non-zero garbage.
-- **Valid player filter** (both `render.cpp` and `gui.cpp`): `lifeState == 0 && teamID >= 2 && health > 0`. `teamID` and `health` are both on `C_BaseEntity` — the shallowest readable fields. Do not filter by `ping` (too unreliable mid-scatter).
-
-### Key namespaces (declared in `gui.h`)
-- `gui::` — all rendering, D3D lifecycle, resource loading
-- `maps::` — `mapTextures`, `mapBounds`, radar sizing constants
-- `icons::` — `iconTextures`, `iconWidths`, `iconHeights`
-- `settings::` — runtime-configurable render options (`showWeaponIcons`, `showPlayerNames`, `showHealthBars`, `showAimLines`, `showTeamPanels`, `iconScale`, `aimLineLength`, `dotRadius`); defined with defaults in `gui.cpp`, exposed in the collapsible Settings panel of `RenderControlPanel()`. Radar-only overlays (weapon icons, names, health bars) default **off** since the enemy panel covers them; aim lines and team panels default on.
+- `update()` is structured as three scatter batches before the entity chain: **Scatter A** (5 module-level offsets including `dwPlantedC4`), **Scatter B** (mapPtr + local player fields + 64 entity chunk pointers), **Scatter C** (mapName + local player name strings).
+- Entity chain passes are **guarded** (`if (players[i].listEntry)` etc.) so empty slots don't generate reads.
+- `VMMDLL_FLAG_ZEROPAD_ON_FAIL` handles complete read failures (returns zeros). `sdk.cpp` has `isValidPtr()` and `isValidAscii()` helpers for validation.
+- **Valid player filter**: `p.pawn.lifeState == 0 && p.ctrl.teamID >= 2 && p.pawn.health > 0`. Do not filter by `ping` (too unreliable mid-scatter).
 
 ### Texture loading
-`LoadImageTexture()` in `dx11.cpp` — two overloads, one optionally outputs pixel dimensions. Used exclusively in `resources.cpp`.
+`LoadImageTexture()` in `src/vgui/dx11.cpp` — two overloads, one optionally outputs pixel dimensions. Used exclusively in `src/vgui/resources.cpp`.
 
 ### Dynamic texture loading system
 Both maps and icons are loaded by scanning their folders at startup via `std::filesystem::directory_iterator` — no hardcoded load calls.

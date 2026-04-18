@@ -7,11 +7,10 @@ static constexpr float PI = 3.14159265f;
 void gui::gameLoop(const CGame& game) {
 	std::string mapName = game.mapName;
 
-	// Resolve multi-level map variants dynamically from parsed overview bounds
 	auto boundsIt = maps::mapBounds.find(mapName);
 	if (boundsIt != maps::mapBounds.end()) {
 		float thresh = boundsIt->second.lowerZThreshold;
-		if (game.localPlayer.position.z <= thresh) {
+		if (game.localPlayer.pawn.position.z <= thresh) {
 			std::string lower = mapName + "_lower";
 			if (maps::mapTextures.count(lower))
 				mapName = lower;
@@ -23,6 +22,7 @@ void gui::gameLoop(const CGame& game) {
 
 	renderMap(texIt->second);
 	renderPlayers(game);
+	renderBomb(game);
 	ImGui::End();
 }
 
@@ -47,46 +47,20 @@ void gui::renderMap(ID3D11ShaderResourceView* texture) {
 	ImGui::PopStyleVar(2);
 }
 
-// Single pass over all players: aim line -> dot (+ defuse ring) -> [optional: weapon icon / health bar / name]
 void gui::renderPlayers(const CGame& game) {
 	ImVec2      windowPos = ImGui::GetWindowPos();
-	const float localZ    = game.localPlayer.position.z;
-
-	// Per-slot visibility state for change logging.
-	static bool wasVisible[64]  = {};
-	static bool wasFiltered[64] = {};
+	const float localZ    = game.localPlayer.pawn.position.z;
 
 	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
 
-		// Log when a slot with a controller gets filtered by render checks (not just absent).
-		if (p.controller) {
-			bool filtered = p.lifeState != 0 || p.teamID < 2 || p.health == 0;
-			if (filtered && wasVisible[i]) {
-				std::cout << "[Render]: Slot " << i << " '" << p.name << "' hidden:"
-				          << (p.lifeState != 0 ? " lifeState=" + std::to_string(p.lifeState) : "")
-				          << (p.teamID     < 2 ? " teamID="    + std::to_string(p.teamID)    : "")
-				          << (p.health    == 0 ? " health=0"                                 : "")
-				          << "\n";
-			}
-			if (!filtered && wasFiltered[i])
-				std::cout << "[Render]: Slot " << i << " '" << p.name << "' visible again\n";
-			wasFiltered[i] = filtered;
-		} else {
-			wasFiltered[i] = false;
-		}
-
-		bool visible = p.controller && p.lifeState == 0 && p.teamID >= 2 && p.health > 0;
-		if (!wasVisible[i] && visible)
-			std::cout << "[Render]: Slot " << i << " '" << p.name << "' appeared\n";
-		wasVisible[i] = visible;
-
+		bool visible = p.controllerBase && p.pawn.lifeState == 0 && p.ctrl.teamID >= 2 && p.pawn.health > 0;
 		if (!visible) continue;
 
-		float x     = p.position.x;
-		float y     = p.position.y;
-		float z     = p.position.z;
-		float angle = p.eyeAngles.y * PI / 180.0f;
+		float x     = p.pawn.position.x;
+		float y     = p.pawn.position.y;
+		float z     = p.pawn.position.z;
+		float angle = p.pawn.eyeAngles.y * PI / 180.0f;
 		worldToRadar(x, y, game);
 
 		float  opacity = setOpacity(localZ, z, game);
@@ -101,8 +75,8 @@ void gui::renderPlayers(const CGame& game) {
 		}
 
 		// Weapon icon -- enemies only
-		if (settings::showWeaponIcons && p.teamID != game.localPlayer.teamID) {
-			int weaponID = p.activeWeaponID;
+		if (settings::showWeaponIcons && p.ctrl.teamID != game.localPlayer.ctrl.teamID) {
+			int weaponID = p.pawn.activeWeaponID;
 			auto texIt = icons::iconTextures.find(weaponID);
 			if (texIt != icons::iconTextures.end() && texIt->second) {
 				float  iconW   = (float)icons::iconWidths[weaponID]  * settings::iconScale;
@@ -119,23 +93,23 @@ void gui::renderPlayers(const CGame& game) {
 			}
 		}
 
-		// Player dot -- local player white, teammates colored, enemies red
+		// Player dot
 		ImU32 dotColor;
-		if      (p.controller == game.localPlayer.controller) dotColor = IM_COL32(255, 255, 255, 255);
-		else if (p.teamID     == game.localPlayer.teamID)     dotColor = setColor(p.color, opacity);
-		else                                                   dotColor = IM_COL32(255, 9, 9, (int)opacity);
+		if      (p.controllerBase == game.localPlayer.controllerBase) dotColor = IM_COL32(255, 255, 255, 255);
+		else if (p.ctrl.teamID    == game.localPlayer.ctrl.teamID)    dotColor = setColor(p.ctrl.color, opacity);
+		else                                                           dotColor = IM_COL32(255, 9, 9, (int)opacity);
 
-		// Defusing ring -- orange circle around the dot, enemies only
-		if (p.isDefusing && p.teamID != game.localPlayer.teamID)
+		// Defusing ring -- orange, enemies only
+		if (p.pawn.isDefusing && p.ctrl.teamID != game.localPlayer.ctrl.teamID)
 			ImGui::GetForegroundDrawList()->AddCircle(pos, settings::dotRadius + 3.5f, IM_COL32(255, 150, 20, (int)opacity), 0, 2.0f);
 
 		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, settings::dotRadius + 1.25f, IM_COL32(0, 0, 0, 255));
 		ImGui::GetForegroundDrawList()->AddCircleFilled(pos, settings::dotRadius,         dotColor);
 
-		// Health bar -- enemies only, vertical bar on the left side of the dot
-		if (settings::showHealthBars && p.teamID != game.localPlayer.teamID) {
+		// Health bar -- enemies only
+		if (settings::showHealthBars && p.ctrl.teamID != game.localPlayer.ctrl.teamID) {
 			constexpr float barW = 3.0f, barH = 18.0f, barX = 14.0f;
-			float filled = (float)p.health / 100.0f;
+			float filled = (float)p.pawn.health / 100.0f;
 			float r = 255.0f * (1.0f - filled);
 			float g = 255.0f * filled;
 			ImVec2 barTL = ImVec2(pos.x - barX - barW, pos.y - barH / 2);
@@ -145,16 +119,46 @@ void gui::renderPlayers(const CGame& game) {
 			ImGui::GetForegroundDrawList()->AddRectFilled(ImVec2(barTL.x, fillY), barBR, IM_COL32((int)r, (int)g, 0, (int)opacity));
 		}
 
-		// Player name below dot -- skip local player
-		if (settings::showPlayerNames && p.controller != game.localPlayer.controller && p.name[0]) {
-			ImVec2 textSize = ImGui::CalcTextSize(p.name);
+		// Player name
+		if (settings::showPlayerNames && p.controllerBase != game.localPlayer.controllerBase && p.ctrl.name[0]) {
+			ImVec2 textSize = ImGui::CalcTextSize(p.ctrl.name);
 			ImVec2 namePos  = ImVec2(pos.x - textSize.x * 0.5f, pos.y + settings::dotRadius + 4.0f);
-			ImGui::GetForegroundDrawList()->AddText(ImVec2(namePos.x + 1, namePos.y + 1), IM_COL32(0,   0,   0,   (int)opacity), p.name);
-			ImGui::GetForegroundDrawList()->AddText(namePos,                               IM_COL32(255, 255, 255, (int)opacity), p.name);
+			ImGui::GetForegroundDrawList()->AddText(ImVec2(namePos.x + 1, namePos.y + 1), IM_COL32(0,   0,   0,   (int)opacity), p.ctrl.name);
+			ImGui::GetForegroundDrawList()->AddText(namePos,                               IM_COL32(255, 255, 255, (int)opacity), p.ctrl.name);
 		}
 	}
 }
 
+void gui::renderBomb(const CGame& game) {
+	ImVec2 windowPos = ImGui::GetWindowPos();
+	const C_PlantedC4& b = game.bomb;
+
+	// Carrier ring -- yellow halo on whoever holds the C4
+	if (b.isCarried && b.carrierSlot >= 0) {
+		const CPlayer& carrier = game.players[b.carrierSlot];
+		if (carrier.controllerBase && carrier.pawn.lifeState == 0) {
+			float x = carrier.pawn.position.x;
+			float y = carrier.pawn.position.y;
+			worldToRadar(x, y, game);
+			ImVec2 pos = ImVec2(windowPos.x + x, windowPos.y + y);
+			ImGui::GetForegroundDrawList()->AddCircle(pos, settings::dotRadius + 5.0f, IM_COL32(255, 220, 0, 210), 0, 1.5f);
+		}
+	}
+
+	// Planted bomb dot
+	if (!b.entity || b.hasDefused || b.hasExploded) return;
+
+	float bx = b.position.x;
+	float by = b.position.y;
+	worldToRadar(bx, by, game);
+	ImVec2 pos = ImVec2(windowPos.x + bx, windowPos.y + by);
+
+	ImGui::GetForegroundDrawList()->AddCircleFilled(pos, settings::dotRadius + 1.25f, IM_COL32(0, 0, 0, 255));
+	ImGui::GetForegroundDrawList()->AddCircleFilled(pos, settings::dotRadius,         IM_COL32(255, 200, 0, 255));
+
+	if (b.isBeingDefused)
+		ImGui::GetForegroundDrawList()->AddCircle(pos, settings::dotRadius + 3.5f, IM_COL32(0, 200, 255, 220), 0, 2.0f);
+}
 
 void gui::worldToRadar(float& x, float& y, const CGame& game) {
 	auto it = maps::mapBounds.find(game.mapName);
@@ -171,12 +175,12 @@ void gui::worldToRadar(float& x, float& y, const CGame& game) {
 
 ImU32 gui::setColor(DWORD color, float opacity) {
 	switch (color) {
-	case -1: return IM_COL32(142, 212, 210, (int)opacity); // Grey
-	case  0: return IM_COL32(  0, 255, 251, (int)opacity); // Blue
-	case  1: return IM_COL32( 47, 255,   0, (int)opacity); // Green
-	case  2: return IM_COL32(255, 255,   0, (int)opacity); // Yellow
-	case  3: return IM_COL32(250, 130,   2, (int)opacity); // Orange
-	case  4: return IM_COL32(250,   2, 182, (int)opacity); // Purple
+	case -1: return IM_COL32(142, 212, 210, (int)opacity);
+	case  0: return IM_COL32(  0, 255, 251, (int)opacity);
+	case  1: return IM_COL32( 47, 255,   0, (int)opacity);
+	case  2: return IM_COL32(255, 255,   0, (int)opacity);
+	case  3: return IM_COL32(250, 130,   2, (int)opacity);
+	case  4: return IM_COL32(250,   2, 182, (int)opacity);
 	default: return IM_COL32(133, 204, 148, (int)opacity);
 	}
 }

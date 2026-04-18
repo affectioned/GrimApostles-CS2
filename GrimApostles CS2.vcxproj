@@ -116,7 +116,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\game;$(ProjectDir)src\memory;$(ProjectDir)src\render;$(ProjectDir)vendor\imgui;$(ProjectDir)vendor\vmm;$(ProjectDir)vendor\dx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\game;$(ProjectDir)src\game\client;$(ProjectDir)src\tier0;$(ProjectDir)src\vgui;$(ProjectDir)vendor\imgui;$(ProjectDir)vendor\vmm;$(ProjectDir)vendor\dx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -137,7 +137,7 @@
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <LanguageStandard_C>stdc17</LanguageStandard_C>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\game;$(ProjectDir)src\memory;$(ProjectDir)src\render;$(ProjectDir)vendor\imgui;$(ProjectDir)vendor\vmm;$(ProjectDir)vendor\dx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir)src\game;$(ProjectDir)src\game\client;$(ProjectDir)src\tier0;$(ProjectDir)src\vgui;$(ProjectDir)vendor\imgui;$(ProjectDir)vendor\vmm;$(ProjectDir)vendor\dx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
     </ClCompile>
@@ -199,24 +199,30 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="src\game\sdk.cpp" />
+    <ClCompile Include="src\game\client\C_PlantedC4.cpp" />
+    <ClCompile Include="src\game\client\CCSPlayerController.cpp" />
+    <ClCompile Include="src\game\client\C_CSPlayerPawn.cpp" />
     <ClCompile Include="src\game\offsets.cpp" />
-    <ClCompile Include="src\memory\sigscan.cpp" />
-    <ClCompile Include="src\memory\dma.cpp" />
+    <ClCompile Include="src\tier0\sigscan.cpp" />
+    <ClCompile Include="src\tier0\dma.cpp" />
     <ClCompile Include="src\game\updater.cpp" />
-    <ClCompile Include="src\render\gui.cpp" />
-    <ClCompile Include="src\render\render.cpp" />
-    <ClCompile Include="src\render\dx11.cpp" />
-    <ClCompile Include="src\render\resources.cpp" />
+    <ClCompile Include="src\vgui\gui.cpp" />
+    <ClCompile Include="src\vgui\render.cpp" />
+    <ClCompile Include="src\vgui\dx11.cpp" />
+    <ClCompile Include="src\vgui\resources.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\pch.h" />
     <ClInclude Include="src\game\sdk.h" />
+    <ClInclude Include="src\game\client\CCSPlayerController.h" />
+    <ClInclude Include="src\game\client\C_CSPlayerPawn.h" />
+    <ClInclude Include="src\game\client\C_PlantedC4.h" />
     <ClInclude Include="src\game\offsets.h" />
-    <ClInclude Include="src\memory\sigscan.h" />
+    <ClInclude Include="src\tier0\sigscan.h" />
     <ClInclude Include="src\game\vec.h" />
-    <ClInclude Include="src\memory\dma.h" />
+    <ClInclude Include="src\tier0\dma.h" />
     <ClInclude Include="src\game\updater.h" />
-    <ClInclude Include="src\render\gui.h" />
+    <ClInclude Include="src\vgui\gui.h" />
     <ClInclude Include="vendor\dx\WICTextureLoader.h" />
     <ClInclude Include="vendor\imgui\imconfig.h" />
     <ClInclude Include="vendor\imgui\imgui.h" />
@@ -233,6 +239,22 @@
     <Library Include="vendor\dx\DirectXTK.lib" />
     <Library Include="vendor\vmm\leechcore.lib" />
     <Library Include="vendor\vmm\vmm.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include=".gitignore" />
+    <None Include="CLAUDE.md" />
+    <None Include="README.md" />
+    <None Include="tools\AssetExtractor\extract.py" />
+    <None Include="tools\AssetExtractor\README.md" />
+    <None Include="tools\AssetExtractor\run.bat" />
+    <None Include="tools\AssetExtractor\vrf\blake3_dotnet.dll" />
+    <None Include="tools\AssetExtractor\vrf\libSkiaSharp.dll" />
+    <None Include="tools\AssetExtractor\vrf\Source2Viewer-CLI.exe" />
+    <None Include="tools\AssetExtractor\vrf\spirv-cross.dll" />
+    <None Include="tools\AssetExtractor\vrf\TinyEXRNative.dll" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="tools\AssetExtractor\requirements.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

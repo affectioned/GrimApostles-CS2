@@ -11,6 +11,7 @@ namespace client_dll {
 	std::ptrdiff_t dwLocalPlayerController = 0x22F0188;
 	std::ptrdiff_t dwLocalPlayerPawn = 0x2065AF0;
 	std::ptrdiff_t dwGlobalVars = 0x205C5C0;
+	std::ptrdiff_t dwPlantedC4 = 0; // resolved via sigscan only — no hardcoded fallback
 }
 
 namespace matchmaking_dll {
@@ -21,9 +22,22 @@ namespace matchmaking_dll {
 
 namespace client_dll {
 	namespace C_BaseEntity {
-		std::ptrdiff_t m_iTeamNum  = 0x3F3;
-		std::ptrdiff_t m_iHealth   = 0x354;
-		std::ptrdiff_t m_lifeState = 0x35C;
+		std::ptrdiff_t m_iTeamNum       = 0x3F3;
+		std::ptrdiff_t m_iHealth        = 0x354;
+		std::ptrdiff_t m_lifeState      = 0x35C;
+		std::ptrdiff_t m_pGameSceneNode = 0x338;
+	}
+
+	namespace CGameSceneNode {
+		std::ptrdiff_t m_vecAbsOrigin = 0xD0;
+	}
+
+	namespace C_PlantedC4 {
+		std::ptrdiff_t m_bBombTicking  = 0x1170;
+		std::ptrdiff_t m_nBombSite     = 0x1174;
+		std::ptrdiff_t m_bHasExploded  = 0x11A5;
+		std::ptrdiff_t m_bBeingDefused = 0x11AC;
+		std::ptrdiff_t m_bBombDefused  = 0x11C4;
 	}
 
 	namespace C_BasePlayerPawn {

@@ -44,11 +44,13 @@ namespace gui {
 	// Control panel (gui.cpp)
 	void RenderControlPanel();
 	void RenderTeamPanels(const CGame&);
+	void RenderBombPanel(const CGame&);
 
 	// Game rendering (render.cpp)
 	void gameLoop(const CGame&);
 	void renderMap(ID3D11ShaderResourceView*);
 	void renderPlayers(const CGame&);
+	void renderBomb(const CGame&);
 
 	// Resource loading (resources.cpp)
 	void loadMapBounds();

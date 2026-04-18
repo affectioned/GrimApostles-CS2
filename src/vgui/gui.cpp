@@ -151,11 +151,12 @@ void gui::RunLoop() {
 
 		RenderControlPanel();
 
-		if (DMADevice::bConnected) {
+		if (g_DMA.bConnected) {
 			game.update();
 			gameLoop(game);
 			if (settings::showTeamPanels)
 				RenderTeamPanels(game);
+			RenderBombPanel(game);
 		}
 
 		ImGui::Render();
@@ -175,7 +176,7 @@ void gui::Cleanup() {
 	CleanupDeviceD3D();
 	::DestroyWindow(hwnd);
 	::UnregisterClassW(wc.lpszClassName, wc.hInstance);
-	DMADevice::ShowKeyPress();
+	g_DMA.ShowKeyPress();
 }
 
 void gui::RenderControlPanel() {
@@ -202,7 +203,7 @@ void gui::RenderControlPanel() {
 	ImGui::Spacing();
 
 	// Status indicator + FPS on the same row
-	if (DMADevice::bConnected)
+	if (g_DMA.bConnected)
 		ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.5f, 1.0f), "● Connected");
 	else
 		ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "● Disconnected");
@@ -217,28 +218,28 @@ void gui::RenderControlPanel() {
 	ImGui::Spacing();
 
 	// Connect / Disconnect button
-	if (DMADevice::bConnected) {
+	if (g_DMA.bConnected) {
 		ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.55f, 0.12f, 0.12f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.72f, 0.20f, 0.20f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.62f, 0.14f, 0.14f, 1.0f));
 		if (ImGui::Button("Disconnect", ImVec2(-1.0f, 28.0f)))
-			DMADevice::Disconnect();
+			g_DMA.Disconnect();
 		ImGui::PopStyleColor(3);
 	} else {
 		ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.45f, 0.22f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.60f, 0.30f, 1.0f));
 		ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.14f, 0.52f, 0.25f, 1.0f));
 		if (ImGui::Button("Connect", ImVec2(-1.0f, 28.0f))) {
-			if (!DMADevice::Connect() || !DMADevice::AttachToProcessId()) {
-				DMADevice::Disconnect();
+			if (!g_DMA.Connect() || !g_DMA.AttachToProcessId()) {
+				g_DMA.Disconnect();
 			} else {
-				DMADevice::moduleBase = DMADevice::getModuleBase(DMADevice::kModule);
-				if (!DMADevice::moduleBase) {
+				g_DMA.moduleBase = g_DMA.getModuleBase(DMADevice::kModule);
+				if (!g_DMA.moduleBase) {
 					std::cout << "[DMA]: client.dll not found — disconnecting\n";
-					DMADevice::Disconnect();
+					g_DMA.Disconnect();
 				} else {
-					std::cout << "[DMA]: " << DMADevice::kProcess << " PID=" << std::dec << DMADevice::dwAttachedProcessId
-						<< " client.dll=0x" << std::hex << DMADevice::moduleBase << "\n";
+					std::cout << "[DMA]: " << DMADevice::kProcess << " PID=" << std::dec << g_DMA.dwAttachedProcessId
+						<< " client.dll=0x" << std::hex << g_DMA.moduleBase << "\n";
 					updater::sigscanOffsets();
 				}
 			}
@@ -254,7 +255,7 @@ void gui::RenderControlPanel() {
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.60f, 0.10f, 0.10f, 1.0f));
 	if (ImGui::Button("Exit", ImVec2(-1.0f, 22.0f))) {
 		exitRequested = true;
-		DMADevice::Disconnect();
+		g_DMA.Disconnect();
 	}
 	ImGui::PopStyleColor(3);
 
@@ -297,7 +298,7 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 	constexpr float kBarH   = 3.0f;
 	constexpr float kIconH  = 14.0f;
 
-	bool        alive  = p.lifeState == 0;
+	bool        alive  = p.pawn.lifeState == 0;
 	float       alpha  = alive ? 1.0f : 0.38f;
 	ImDrawList* dl     = ImGui::GetWindowDrawList();
 	ImVec2      origin = ImGui::GetCursorScreenPos();
@@ -306,9 +307,9 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 
 	// Dot
 	ImU32 dotCol;
-	if      (p.controller == game.localPlayer.controller) dotCol = IM_COL32(255, 255, 255, (int)(alpha * 255));
-	else if (!isEnemy)                                     dotCol = gui::setColor(p.color, alpha * 255.0f);
-	else                                                   dotCol = IM_COL32(255, 60,  60,  (int)(alpha * 255));
+	if      (p.controllerBase == game.localPlayer.controllerBase) dotCol = IM_COL32(255, 255, 255, (int)(alpha * 255));
+	else if (!isEnemy)                                             dotCol = gui::setColor(p.ctrl.color, alpha * 255.0f);
+	else                                                           dotCol = IM_COL32(255, 60,  60,  (int)(alpha * 255));
 
 	ImVec2 dotCtr = { origin.x + kDotR + 2.0f, origin.y + lineH * 0.5f + 1.0f };
 	dl->AddCircleFilled(dotCtr, kDotR + 1.0f, IM_COL32(0, 0, 0, (int)(alpha * 180)));
@@ -316,7 +317,7 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 
 	// Name (left) + HP number (right)
 	char hpBuf[8];
-	if (alive) snprintf(hpBuf, sizeof(hpBuf), "%d", p.health);
+	if (alive) snprintf(hpBuf, sizeof(hpBuf), "%d", p.pawn.health);
 	else       snprintf(hpBuf, sizeof(hpBuf), "---");
 
 	float hpTextW  = ImGui::CalcTextSize(hpBuf).x;
@@ -327,11 +328,11 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 
 	ImVec2 nameScreen = ImGui::GetCursorScreenPos();
 	ImGui::PushClipRect(nameScreen, { nameScreen.x + nameMaxW, nameScreen.y + lineH + 2.0f }, true);
-	ImGui::TextUnformatted(p.name[0] ? p.name : "...");
+	ImGui::TextUnformatted(p.ctrl.name[0] ? p.ctrl.name : "...");
 	ImGui::PopClipRect();
 
 	ImGui::SameLine(winW - hpTextW - 14.0f);
-	if (alive) ImGui::Text("%d", p.health);
+	if (alive) ImGui::Text("%d", p.pawn.health);
 	else       ImGui::TextDisabled("---");
 	ImGui::PopStyleColor();
 
@@ -339,7 +340,7 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 	float barStartX = origin.x + kIndent;
 	float barW      = winW - kIndent - 14.0f;
 	ImVec2 barTL    = { barStartX, ImGui::GetCursorScreenPos().y };
-	float filled    = alive ? (float)p.health / 100.0f : 0.0f;
+	float filled    = alive ? (float)p.pawn.health / 100.0f : 0.0f;
 	if (filled > 1.0f) filled = 1.0f;
 	float r = 255.0f * (1.0f - filled);
 	float g = 255.0f * filled;
@@ -350,10 +351,10 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 	// Weapon icon (left-indented)
 	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + kIndent);
 	if (alive) {
-		auto texIt = icons::iconTextures.find(p.activeWeaponID);
+		auto texIt = icons::iconTextures.find(p.pawn.activeWeaponID);
 		if (texIt != icons::iconTextures.end() && texIt->second) {
-			int iw = icons::iconWidths.count(p.activeWeaponID)  ? icons::iconWidths[p.activeWeaponID]  : 1;
-			int ih = icons::iconHeights.count(p.activeWeaponID) ? icons::iconHeights[p.activeWeaponID] : 1;
+			int iw = icons::iconWidths.count(p.pawn.activeWeaponID)  ? icons::iconWidths[p.pawn.activeWeaponID]  : 1;
+			int ih = icons::iconHeights.count(p.pawn.activeWeaponID) ? icons::iconHeights[p.pawn.activeWeaponID] : 1;
 			float iconW = (ih > 0) ? kIconH * (float)iw / (float)ih : kIconH;
 			ImGui::Image((ImTextureID)texIt->second, { iconW, kIconH });
 		} else {
@@ -364,27 +365,27 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 	}
 
 	// Last place name (center of the row)
-	if (alive && p.lastPlaceName[0]) {
+	if (alive && p.pawn.lastPlaceName[0]) {
 		ImGui::SameLine();
-		ImGui::TextDisabled("%s", p.lastPlaceName);
+		ImGui::TextDisabled("%s", p.pawn.lastPlaceName);
 	}
 
 	// Right-aligned: DEFUSING takes priority, otherwise armor/defuser/ping
-	if (alive && p.isDefusing) {
+	if (alive && p.pawn.isDefusing) {
 		constexpr const char* kLabel = "DEFUSING";
 		ImGui::SameLine(winW - ImGui::CalcTextSize(kLabel).x - 14.0f);
 		ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.1f, 1.0f), kLabel);
 	} else {
 		char status[32] = {};
-		if (alive && p.armor > 0)
-			snprintf(status, sizeof(status), "%s", p.hasHelmet ? "H" : "K");
-		if (alive && p.hasDefuser) {
+		if (alive && p.ctrl.armor > 0)
+			snprintf(status, sizeof(status), "%s", p.ctrl.hasHelmet ? "H" : "K");
+		if (alive && p.ctrl.hasDefuser) {
 			size_t l = strlen(status);
 			snprintf(status + l, sizeof(status) - l, "%sD", l ? " " : "");
 		}
-		if (p.ping > 0) {
+		if (p.ctrl.ping > 0) {
 			size_t l = strlen(status);
-			snprintf(status + l, sizeof(status) - l, "%s%dms", l ? " " : "", (int)p.ping);
+			snprintf(status + l, sizeof(status) - l, "%s%dms", l ? " " : "", (int)p.ctrl.ping);
 		}
 		if (status[0]) {
 			float sw = ImGui::CalcTextSize(status).x;
@@ -409,7 +410,7 @@ void gui::RenderTeamPanels(const CGame& game) {
 		ImGuiWindowFlags_AlwaysAutoResize  |
 		ImGuiWindowFlags_NoSavedSettings;
 
-	uint8_t myTeam = game.localPlayer.teamID;
+	uint8_t myTeam = game.localPlayer.ctrl.teamID;
 
 	ImGui::SetNextWindowPos(ImVec2(kPad, kPad), ImGuiCond_Always);
 	ImGui::SetNextWindowSize(ImVec2(kPanelW, 0.0f), ImGuiCond_Always);
@@ -423,8 +424,90 @@ void gui::RenderTeamPanels(const CGame& game) {
 
 	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
-		if (!p.controller || p.teamID < 2 || p.teamID == myTeam || p.health == 0) continue;
+		if (!p.controllerBase || p.ctrl.teamID < 2 || p.ctrl.teamID == myTeam || p.pawn.health == 0) continue;
 		renderPlayerEntry(p, game, true);
 	}
+	ImGui::End();
+}
+
+// ─── Bomb Panel ───────────────────────────────────────────────────────────────
+
+void gui::RenderBombPanel(const CGame& game) {
+	const C_PlantedC4& b = game.bomb;
+
+	// Only show when there is actionable bomb info
+	if (!b.isCarried && !b.entity) return;
+
+	constexpr float kPanelW = 200.0f;
+	constexpr float kPad    = 10.0f;
+	constexpr ImGuiWindowFlags kFlags =
+		ImGuiWindowFlags_NoTitleBar        |
+		ImGuiWindowFlags_NoResize          |
+		ImGuiWindowFlags_NoMove            |
+		ImGuiWindowFlags_NoScrollbar       |
+		ImGuiWindowFlags_AlwaysAutoResize  |
+		ImGuiWindowFlags_NoSavedSettings;
+
+	// Anchor to bottom-left corner
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui::SetNextWindowPos(ImVec2(kPad, io.DisplaySize.y - kPad), ImGuiCond_Always, ImVec2(0.0f, 1.0f));
+	ImGui::SetNextWindowSize(ImVec2(kPanelW, 0.0f), ImGuiCond_Always);
+	ImGui::Begin("##bomb", nullptr, kFlags);
+
+	// Title
+	ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize("BOMB").x) * 0.5f);
+	ImGui::TextColored(ImVec4(1.0f, 0.85f, 0.0f, 1.0f), "BOMB");
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (b.hasDefused) {
+		// Defused
+		ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize("DEFUSED").x) * 0.5f);
+		ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.4f, 1.0f), "DEFUSED");
+
+	} else if (b.hasExploded) {
+		// Exploded
+		ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize("EXPLODED").x) * 0.5f);
+		ImGui::TextColored(ImVec4(1.0f, 0.3f, 0.3f, 1.0f), "EXPLODED");
+
+	} else if (b.entity) {
+		// Planted — show site + countdown
+		const char* siteStr = (b.site == 0) ? "A" : (b.site == 1) ? "B" : "?";
+		char plantBuf[24];
+		snprintf(plantBuf, sizeof(plantBuf), "PLANTED - %s", siteStr);
+		ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize(plantBuf).x) * 0.5f);
+		ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", plantBuf);
+
+		// Timer — turns red below 10 seconds
+		float   rem = b.timeRemaining();
+		ImVec4  timerCol = (rem > 10.0f) ? ImVec4(1.0f, 0.9f, 0.3f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f);
+		char    timerBuf[12];
+		snprintf(timerBuf, sizeof(timerBuf), "%.1fs", rem);
+		ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize(timerBuf).x) * 0.5f);
+		ImGui::TextColored(timerCol, "%s", timerBuf);
+
+		if (b.isBeingDefused) {
+			constexpr const char* kDefusing = "DEFUSING";
+			ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize(kDefusing).x) * 0.5f);
+			ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), kDefusing);
+		}
+
+	} else if (b.isCarried && b.carrierSlot >= 0) {
+		// Carried — show who has it
+		const CPlayer& carrier  = game.players[b.carrierSlot];
+		bool           isEnemy  = carrier.ctrl.teamID != game.localPlayer.ctrl.teamID;
+		const char*    label    = isEnemy ? "ENEMY HAS C4" : "TEAM HAS C4";
+		ImVec4         labelCol = isEnemy ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) : ImVec4(0.3f, 1.0f, 0.5f, 1.0f);
+		ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize(label).x) * 0.5f);
+		ImGui::TextColored(labelCol, "%s", label);
+
+		if (carrier.ctrl.name[0]) {
+			ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize(carrier.ctrl.name).x) * 0.5f);
+			ImGui::TextDisabled("%s", carrier.ctrl.name);
+		}
+	}
+
+	ImGui::Spacing();
 	ImGui::End();
 }

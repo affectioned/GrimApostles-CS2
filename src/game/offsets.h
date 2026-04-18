@@ -9,6 +9,7 @@ namespace client_dll {
 	extern std::ptrdiff_t dwLocalPlayerController;
 	extern std::ptrdiff_t dwLocalPlayerPawn;
 	extern std::ptrdiff_t dwGlobalVars;
+	extern std::ptrdiff_t dwPlantedC4;
 }
 
 namespace matchmaking_dll {
@@ -20,9 +21,22 @@ namespace matchmaking_dll {
 
 namespace client_dll {
 	namespace C_BaseEntity {
-		extern std::ptrdiff_t m_iTeamNum;   // uint8_t
-		extern std::ptrdiff_t m_iHealth;    // int32_t
-		extern std::ptrdiff_t m_lifeState;  // uint8_t (0=alive, 1=dying, 2=dead)
+		extern std::ptrdiff_t m_iTeamNum;       // uint8_t
+		extern std::ptrdiff_t m_iHealth;        // int32_t
+		extern std::ptrdiff_t m_lifeState;      // uint8_t (0=alive, 1=dying, 2=dead)
+		extern std::ptrdiff_t m_pGameSceneNode; // CGameSceneNode*
+	}
+
+	namespace CGameSceneNode {
+		extern std::ptrdiff_t m_vecAbsOrigin;   // Vector3
+	}
+
+	namespace C_PlantedC4 {
+		extern std::ptrdiff_t m_bBombTicking;  // bool
+		extern std::ptrdiff_t m_nBombSite;     // int32 (0=A, 1=B)
+		extern std::ptrdiff_t m_bHasExploded;  // bool
+		extern std::ptrdiff_t m_bBeingDefused; // bool
+		extern std::ptrdiff_t m_bBombDefused;  // bool
 	}
 
 	namespace C_BasePlayerPawn {

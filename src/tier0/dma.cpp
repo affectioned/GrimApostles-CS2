@@ -1,11 +1,7 @@
 #include "pch.h"
 #include "dma.h"
 
-bool DMADevice::bConnected = false;
-DWORD DMADevice::dwAttachedProcessId = 0;
-VMM_HANDLE DMADevice::hVMM = NULL;
-uint64_t DMADevice::moduleBase = 0;
-VMMDLL_SCATTER_HANDLE DMADevice::hScatter = NULL;
+DMADevice g_DMA;
 
 void DMADevice::ShowKeyPress() {
 	std::cout << "\nPress any key to exit\n";
@@ -31,7 +27,7 @@ bool DMADevice::Connect() {
 		!VMMDLL_ConfigGet(hVMM, LC_OPT_FPGA_VERSION_MINOR, &minor)) {
 		std::cout << "[DMA]: Failed to read FPGA config\n";
 		VMMDLL_Close(hVMM);
-		hVMM = NULL;
+		hVMM = nullptr;
 		return false;
 	}
 	std::cout << "[DMA]: FPGA ID=" << id << " v" << major << "." << minor << "\n";
@@ -57,7 +53,7 @@ void DMADevice::Disconnect() {
 	bConnected = false;
 	VMMDLL_Close(hVMM);
 	VMMDLL_Scatter_CloseHandle(hScatter);
-	hVMM = NULL; hScatter = NULL;
+	hVMM = nullptr; hScatter = nullptr;
 	dwAttachedProcessId = 0; moduleBase = 0;
 }
 
@@ -68,9 +64,9 @@ bool DMADevice::AttachToProcessId() {
 		return false;
 	}
 	VMMDLL_PROCESS_INFORMATION info = {};
-	info.magic = VMMDLL_PROCESS_INFORMATION_MAGIC;
+	info.magic    = VMMDLL_PROCESS_INFORMATION_MAGIC;
 	info.wVersion = VMMDLL_PROCESS_INFORMATION_VERSION;
-	SIZE_T size = sizeof(info);
+	SIZE_T size   = sizeof(info);
 	if (!VMMDLL_ProcessGetInformation(hVMM, dwAttachedProcessId, &info, &size)) {
 		std::cout << "[DMA]: Failed to get process information\n";
 		return false;
@@ -91,11 +87,11 @@ uint64_t DMADevice::getModuleBase(const char* moduleName) {
 	return VMMDLL_ProcessGetModuleBaseU(hVMM, dwAttachedProcessId, const_cast<LPSTR>(moduleName));
 }
 
-bool DMADevice::Clear(VMMDLL_SCATTER_HANDLE hSCATTER) {
-	return VMMDLL_Scatter_Clear(hSCATTER, dwAttachedProcessId,
+bool DMADevice::Clear() {
+	return VMMDLL_Scatter_Clear(hScatter, dwAttachedProcessId,
 		VMMDLL_FLAG_NOCACHE | VMMDLL_FLAG_NOPAGING | VMMDLL_FLAG_NOCACHEPUT | VMMDLL_FLAG_ZEROPAD_ON_FAIL | VMMDLL_FLAG_NOPAGING_IO);
 }
 
-bool DMADevice::ExecuteRead(VMMDLL_SCATTER_HANDLE hSCATTER) {
-	return VMMDLL_Scatter_ExecuteRead(hSCATTER);
+bool DMADevice::ExecuteRead() {
+	return VMMDLL_Scatter_ExecuteRead(hScatter);
 }

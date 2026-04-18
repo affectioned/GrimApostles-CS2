@@ -2,12 +2,10 @@
 #include "sdk.h"
 #include "updater.h"
 
-// Returns true for a plausible Windows user-space pointer.
 static bool isValidPtr(uint64_t p) {
 	return p > 0x10000ULL && p < 0x7FFFFFFFFFFF0000ULL;
 }
 
-// Returns true if the string is non-empty and contains only printable ASCII.
 static bool isValidAscii(const char* s, size_t n) {
 	if (!s || !s[0]) return false;
 	for (size_t i = 0; i < n && s[i]; i++) {
@@ -17,191 +15,144 @@ static bool isValidAscii(const char* s, size_t n) {
 	return true;
 }
 
+// ─── update ───────────────────────────────────────────────────────────────────
+
 void CGame::update() {
 	(void)updater::classOffsetsReady.load(std::memory_order_acquire);
 
-	CPlayer prev[64];
-	memcpy(prev, players, sizeof(prev));
+	uint64_t base = g_DMA.moduleBase;
 
-	// ── Scatter A: all module-level offsets in one batch (was 4 separate MemReadPtrs) ──
-	uint64_t globalVarsPtr = 0, newController = 0, newPawn = 0, newEntityList = 0;
-	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwGlobalVars,            &globalVarsPtr, sizeof(uint64_t));
-	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwLocalPlayerController, &newController, sizeof(uint64_t));
-	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwLocalPlayerPawn,       &newPawn,       sizeof(uint64_t));
-	DMADevice::PrepareEX(DMADevice::hScatter, DMADevice::moduleBase + client_dll::dwEntityList,            &newEntityList, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
+	// Scatter A: module-level pointers
+	uint64_t globalVarsPtr = 0, newController = 0, newPawn = 0, newEntityList = 0, plantedC4Ptr = 0;
+	g_DMA.PrepareEX(base + client_dll::dwGlobalVars,            &globalVarsPtr, sizeof(uint64_t));
+	g_DMA.PrepareEX(base + client_dll::dwLocalPlayerController, &newController, sizeof(uint64_t));
+	g_DMA.PrepareEX(base + client_dll::dwLocalPlayerPawn,       &newPawn,       sizeof(uint64_t));
+	g_DMA.PrepareEX(base + client_dll::dwEntityList,            &newEntityList, sizeof(uint64_t));
+	g_DMA.PrepareEX(base + client_dll::dwPlantedC4,             &plantedC4Ptr,  sizeof(uint64_t));
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
 
-	if (newController && !isValidPtr(newController)) newController = 0;
-	if (newPawn       && !isValidPtr(newPawn))       newPawn       = 0;
-	if (!isValidPtr(newEntityList))                  newEntityList = 0;
-	if (!isValidPtr(globalVarsPtr))                  globalVarsPtr = 0;
+	if (!isValidPtr(globalVarsPtr)) globalVarsPtr = 0;
+	if (!isValidPtr(newEntityList)) newEntityList  = 0;
+	if (!isValidPtr(newController)) newController  = 0;
+	if (!isValidPtr(newPawn))       newPawn        = 0;
+	if (!isValidPtr(plantedC4Ptr))  plantedC4Ptr   = 0;
 
-	if (newEntityList) {
-		static uint64_t prevEL = 0;
-		if (newEntityList != prevEL) { std::cout << "[SDK]: Entity list -> 0x" << std::hex << newEntityList << std::dec << "\n"; prevEL = newEntityList; }
-		entityList = newEntityList;
-	}
-	{
-		static uint64_t prevCtrl = 0;
-		if (newController != prevCtrl) { std::cout << "[SDK]: Local controller -> 0x" << std::hex << newController << std::dec << "\n"; prevCtrl = newController; }
-	}
-	localPlayer.controller = newController;
-	localPlayer.pawn       = newPawn;
+	static uint64_t prevEL = 0, prevCtrl = 0;
+	if (newEntityList != prevEL)   { std::cout << "[SDK]: Entity list -> 0x"      << std::hex << newEntityList << std::dec << "\n"; prevEL   = newEntityList; }
+	if (newController != prevCtrl) { std::cout << "[SDK]: Local controller -> 0x" << std::hex << newController << std::dec << "\n"; prevCtrl = newController; }
 
-	// ── Scatter B: one level deep + entity chunk pointers (was separate calls + scatter pass 1) ──
-	// Batches: mapPtr, local player fields, and all 64 entity list chunk reads in one round trip.
+	if (newEntityList) entityList = newEntityList;
+	localPlayer.controllerBase = newController;
+	localPlayer.pawnBase       = newPawn;
+
+	// Scatter B: map ptr, local player fields, entity list chunk roots
 	uint64_t mapPtr = 0;
 	memset(players, 0, sizeof(players));
 
 	if (globalVarsPtr)
-		DMADevice::PrepareEX(DMADevice::hScatter, globalVarsPtr + 0x0188,                                                          &mapPtr,               sizeof(uint64_t));
-	if (localPlayer.controller) {
-		DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.controller + client_dll::C_BaseEntity::m_iTeamNum,                   &localPlayer.teamID,   sizeof(uint8_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName, &localPlayer.nameAddr, sizeof(uint64_t));
-	}
-	if (localPlayer.pawn)
-		DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.pawn + client_dll::C_BasePlayerPawn::m_vOldOrigin,                   &localPlayer.position, sizeof(Vector3));
+		g_DMA.PrepareEX(globalVarsPtr + 0x0188, &mapPtr, sizeof(uint64_t));
+
+	if (localPlayer.controllerBase)
+		localPlayer.ctrl.Read(localPlayer.controllerBase);
+
+	if (localPlayer.pawnBase)
+		g_DMA.PrepareEX(localPlayer.pawnBase + client_dll::C_BasePlayerPawn::m_vOldOrigin, &localPlayer.pawn.position, sizeof(Vector3));
+
 	for (int i = 0; i < 64; i++)
-		DMADevice::PrepareEX(DMADevice::hScatter, entityList + (0x8 * ((i + 1) >> 9) + 16), &players[i].listEntry, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
+		g_DMA.PrepareEX(entityList + (0x8 * ((i + 1) >> 9) + 16), &players[i].listEntry, sizeof(uint64_t));
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
 
-	// ── Scatter C: string data (was 2 separate MemReads) ──────────────────────
-	char mapNameBuf[32] = {}, nameBuf[32] = {};
-	bool readingMap  = isValidPtr(mapPtr);
-	bool readingName = isValidPtr(localPlayer.nameAddr);
+	// Scatter C: string data
+	char mapNameBuf[32] = {};
+	if (isValidPtr(mapPtr))                   g_DMA.PrepareEX(mapPtr,                    mapNameBuf,                sizeof(mapNameBuf));
+	if (isValidPtr(localPlayer.ctrl.nameAddr)) g_DMA.PrepareEX(localPlayer.ctrl.nameAddr, localPlayer.ctrl.name,    sizeof(localPlayer.ctrl.name));
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
 
-	if (readingMap)  DMADevice::PrepareEX(DMADevice::hScatter, mapPtr,                  mapNameBuf, sizeof(mapNameBuf));
-	if (readingName) DMADevice::PrepareEX(DMADevice::hScatter, localPlayer.nameAddr,    nameBuf,    sizeof(nameBuf));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
+	mapNameBuf[sizeof(mapNameBuf) - 1] = '\0';
 
-	if (readingMap) {
-		mapNameBuf[sizeof(mapNameBuf) - 1] = '\0';
-		if (isValidAscii(mapNameBuf, sizeof(mapNameBuf))) {
-			static char prevMap[32] = {};
-			if (strncmp(mapNameBuf, prevMap, sizeof(mapNameBuf)) != 0) {
-				std::cout << "[SDK]: Map -> " << mapNameBuf << "\n";
-				memcpy(prevMap, mapNameBuf, sizeof(mapNameBuf));
-			}
-			memcpy(mapName, mapNameBuf, sizeof(mapName));
+	auto logOnChange = [](char* dst, size_t n, const char* src, const char* label) {
+		if (!isValidAscii(src, n)) return;
+		if (strncmp(dst, src, n) != 0) {
+			std::cout << "[SDK]: " << label << " -> " << src << "\n";
+			memcpy(dst, src, n);
 		}
-	}
-	if (readingName) {
-		nameBuf[sizeof(nameBuf) - 1] = '\0';
-		if (isValidAscii(nameBuf, sizeof(nameBuf))) {
-			memcpy(localPlayer.name, nameBuf, sizeof(localPlayer.name));
-			static char prevName[32] = {};
-			if (strncmp(localPlayer.name, prevName, sizeof(prevName)) != 0) {
-				std::cout << "[SDK]: Local player name -> " << localPlayer.name << "\n";
-				memcpy(prevName, localPlayer.name, sizeof(prevName));
-			}
-		}
-	}
+	};
+	if (isValidPtr(mapPtr)) logOnChange(mapName, sizeof(mapName), mapNameBuf, "Map");
 
-	// ── Entity chain passes 2–5 (guarded: only prepare reads for valid slots) ──
-	for (int i = 0; i < 64; i++)
-		if (players[i].listEntry)
-			DMADevice::PrepareEX(DMADevice::hScatter, players[i].listEntry + 0x70 * ((i + 1) & 0x1FF), &players[i].controller, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	for (int i = 0; i < 64; i++)
-		if (players[i].controller)
-			DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_hPlayerPawn, &players[i].pawnAddr, sizeof(uint32_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	for (int i = 0; i < 64; i++)
-		if (players[i].pawnAddr)
-			DMADevice::PrepareEX(DMADevice::hScatter, entityList + 0x8 * ((players[i].pawnAddr & 0x7FFF) >> 9) + 16, &players[i].listEntry2, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
-
-	for (int i = 0; i < 64; i++)
-		if (players[i].listEntry2)
-			DMADevice::PrepareEX(DMADevice::hScatter, players[i].listEntry2 + 0x70 * (players[i].pawnAddr & 0x1FF), &players[i].pawn, sizeof(uint64_t));
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
+	// Entity chain: listEntry → controllerBase → pawnHandle → listEntry2 → pawnBase
+	resolveEntityChain();
 
 	getPlayerData();
 	getWeapons();
-
-	// ── Cache restore + drop logging ──────────────────────────────────────────
-	for (int i = 0; i < 64; i++) {
-		bool hadPlayer = isValidPtr(prev[i].controller);
-
-		bool ctrlGarbage = players[i].controller && !isValidPtr(players[i].controller);
-		bool pawnGarbage = players[i].pawn       && !isValidPtr(players[i].pawn);
-		if (ctrlGarbage || pawnGarbage) {
-			if (hadPlayer) {
-				std::cout << "[SDK]: Slot " << i << " '" << prev[i].name << "' cache-restored ("
-				          << (ctrlGarbage ? "garbage ctrl" : "garbage pawn") << ")\n";
-				players[i] = prev[i];
-			}
-			continue;
-		}
-
-		// Slot zeroed out — valid prev entry silently dropped by a zero read.
-		if (hadPlayer && !players[i].controller)
-			std::cout << "[SDK]: Slot " << i << " '" << prev[i].name << "' dropped (zero read)\n";
-
-		if (!isValidAscii(players[i].name, sizeof(players[i].name)) &&
-			isValidAscii(prev[i].name, sizeof(prev[i].name)))
-			memcpy(players[i].name, prev[i].name, sizeof(players[i].name));
-	}
+	getBombData(plantedC4Ptr);
 }
 
+// ─── resolveEntityChain ───────────────────────────────────────────────────────
 
-// ─── Player data (two consolidated scatter passes) ────────────────────────────
+void CGame::resolveEntityChain() {
+	for (int i = 0; i < 64; i++)
+		if (players[i].listEntry)
+			g_DMA.PrepareEX(players[i].listEntry + 0x70 * ((i + 1) & 0x1FF), &players[i].controllerBase, sizeof(uint64_t));
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	for (int i = 0; i < 64; i++)
+		if (players[i].controllerBase)
+			g_DMA.PrepareEX(players[i].controllerBase + client_dll::CCSPlayerController::m_hPlayerPawn, &players[i].pawnHandle, sizeof(uint32_t));
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	for (int i = 0; i < 64; i++)
+		if (players[i].pawnHandle)
+			g_DMA.PrepareEX(entityList + 0x8 * ((players[i].pawnHandle & 0x7FFF) >> 9) + 16, &players[i].listEntry2, sizeof(uint64_t));
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+
+	for (int i = 0; i < 64; i++)
+		if (players[i].listEntry2)
+			g_DMA.PrepareEX(players[i].listEntry2 + 0x70 * (players[i].pawnHandle & 0x1FF), &players[i].pawnBase, sizeof(uint64_t));
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
+}
+
+// ─── getPlayerData ────────────────────────────────────────────────────────────
 
 void CGame::getPlayerData() {
 	for (int i = 0; i < 64; i++) {
-		if (!players[i].controller || !players[i].pawn) continue;
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName, &players[i].nameAddr,     sizeof(uint64_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::C_BaseEntity::m_iTeamNum,                    &players[i].teamID,       sizeof(uint8_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iCompTeammateColor,   &players[i].color,        sizeof(DWORD));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BaseEntity::m_iHealth,                    &players[i].health,       sizeof(uint32_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BaseEntity::m_lifeState,                  &players[i].lifeState,    sizeof(uint8_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_angEyeAngles,             &players[i].eyeAngles,    sizeof(Vector2));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_BasePlayerPawn::m_vOldOrigin,             &players[i].position,     sizeof(Vector3));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_pClippingWeapon,          &players[i].activeWeapon,    sizeof(uint64_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_bIsDefusing,              &players[i].isDefusing,      sizeof(bool));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].pawn       + client_dll::C_CSPlayerPawn::m_szLastPlaceName,          &players[i].lastPlaceName,   sizeof(players[i].lastPlaceName));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iPing,               &players[i].ping,         sizeof(uint32_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_iPawnArmor,          &players[i].armor,        sizeof(int32_t));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_bPawnHasDefuser,     &players[i].hasDefuser,   sizeof(bool));
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].controller + client_dll::CCSPlayerController::m_bPawnHasHelmet,      &players[i].hasHelmet,    sizeof(bool));
+		if (!players[i].controllerBase || !players[i].pawnBase) continue;
+		players[i].ctrl.Read(players[i].controllerBase);
+		players[i].pawn.Read(players[i].pawnBase);
 	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
 
 	for (int i = 0; i < 64; i++) {
-		if (!players[i].nameAddr) continue;
-		DMADevice::PrepareEX(DMADevice::hScatter, players[i].nameAddr, &players[i].name, sizeof(players[i].name));
+		if (!players[i].ctrl.nameAddr) continue;
+		players[i].ctrl.ReadName();
 	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
 
 	for (int i = 0; i < 64; i++) {
-		players[i].name[sizeof(players[i].name) - 1]                  = '\0';
-		players[i].lastPlaceName[sizeof(players[i].lastPlaceName) - 1] = '\0';
+		players[i].ctrl.name[sizeof(players[i].ctrl.name) - 1]                  = '\0';
+		players[i].pawn.lastPlaceName[sizeof(players[i].pawn.lastPlaceName) - 1] = '\0';
 	}
 }
 
-// ─── Weapons ─────────────────────────────────────────────────────────────────
+// ─── getWeapons ───────────────────────────────────────────────────────────────
 
 void CGame::getWeapons() {
 	for (int i = 0; i < 64; i++) {
-		if (!players[i].activeWeapon) continue;
-		DMADevice::PrepareEX(DMADevice::hScatter,
-			players[i].activeWeapon
+		if (!players[i].pawn.activeWeapon) continue;
+		uint64_t itemAddr = players[i].pawn.activeWeapon
 			+ client_dll::C_EconEntity::m_AttributeManager
 			+ client_dll::C_AttributeContainer::m_Item
-			+ client_dll::C_EconItemView::m_iItemDefinitionIndex,
-			&players[i].activeWeaponID, sizeof(uint16_t));
+			+ client_dll::C_EconItemView::m_iItemDefinitionIndex;
+		g_DMA.PrepareEX(itemAddr, &players[i].pawn.activeWeaponID, sizeof(players[i].pawn.activeWeaponID));
 	}
-	DMADevice::ExecuteRead(DMADevice::hScatter);
-	DMADevice::Clear(DMADevice::hScatter);
+	g_DMA.ExecuteRead();
+	g_DMA.Clear();
 }
