@@ -66,6 +66,38 @@ void gui::InitImGui() {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 
+	// Hook our settings into ImGui's .ini system — loads on first NewFrame(), saves on DestroyContext()
+	ImGui::GetIO().IniFilename = "GrimApostles.ini";
+
+	ImGuiSettingsHandler h;
+	h.TypeName   = "GrimApostles";
+	h.TypeHash   = ImHashStr("GrimApostles");
+	h.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) -> void* { return (void*)1; };
+	h.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line) {
+		int i; float f;
+		if      (sscanf(line, "WeaponIcons=%d", &i) == 1) settings::showWeaponIcons = i != 0;
+		else if (sscanf(line, "PlayerNames=%d", &i) == 1) settings::showPlayerNames = i != 0;
+		else if (sscanf(line, "HealthBars=%d",  &i) == 1) settings::showHealthBars  = i != 0;
+		else if (sscanf(line, "AimLines=%d",    &i) == 1) settings::showAimLines    = i != 0;
+		else if (sscanf(line, "TeamPanels=%d",  &i) == 1) settings::showTeamPanels  = i != 0;
+		else if (sscanf(line, "IconScale=%f",   &f) == 1) settings::iconScale       = f;
+		else if (sscanf(line, "AimLength=%f",   &f) == 1) settings::aimLineLength   = f;
+		else if (sscanf(line, "DotRadius=%f",   &f) == 1) settings::dotRadius       = f;
+	};
+	h.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* h, ImGuiTextBuffer* buf) {
+		buf->appendf("[%s][Settings]\n", h->TypeName);
+		buf->appendf("WeaponIcons=%d\n", settings::showWeaponIcons);
+		buf->appendf("PlayerNames=%d\n", settings::showPlayerNames);
+		buf->appendf("HealthBars=%d\n",  settings::showHealthBars);
+		buf->appendf("AimLines=%d\n",    settings::showAimLines);
+		buf->appendf("TeamPanels=%d\n",  settings::showTeamPanels);
+		buf->appendf("IconScale=%.3f\n", settings::iconScale);
+		buf->appendf("AimLength=%.1f\n", settings::aimLineLength);
+		buf->appendf("DotRadius=%.2f\n", settings::dotRadius);
+		buf->append("\n");
+	};
+	ImGui::AddSettingsHandler(&h);
+
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.WindowRounding    = 6.0f;
 	style.FrameRounding     = 4.0f;
