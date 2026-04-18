@@ -38,6 +38,15 @@ void CGame::update() {
 	if (!isValidPtr(newPawn))       newPawn        = 0;
 	if (!isValidPtr(plantedC4Ptr))  plantedC4Ptr   = 0;
 
+	// dwPlantedC4 points to a CUtlVector — dereference once to get the actual C_PlantedC4*
+	if (plantedC4Ptr) {
+		uint64_t c4Entity = 0;
+		g_DMA.PrepareEX(plantedC4Ptr, &c4Entity, sizeof(uint64_t));
+		g_DMA.ExecuteRead();
+		g_DMA.Clear();
+		plantedC4Ptr = isValidPtr(c4Entity) ? c4Entity : 0;
+	}
+
 	static uint64_t prevEL = 0, prevCtrl = 0;
 	if (newEntityList != prevEL)   { std::cout << "[SDK]: Entity list -> 0x"      << std::hex << newEntityList << std::dec << "\n"; prevEL   = newEntityList; }
 	if (newController != prevCtrl) { std::cout << "[SDK]: Local controller -> 0x" << std::hex << newController << std::dec << "\n"; prevCtrl = newController; }
