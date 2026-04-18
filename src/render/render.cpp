@@ -52,9 +52,36 @@ void gui::renderPlayers(const CGame& game) {
 	ImVec2      windowPos = ImGui::GetWindowPos();
 	const float localZ    = game.localPlayer.position.z;
 
+	// Per-slot visibility state for change logging.
+	static bool wasVisible[64]  = {};
+	static bool wasFiltered[64] = {};
+
 	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
-		if (!p.controller || p.lifeState != 0 || p.teamID < 2 || p.health == 0) continue;
+
+		// Log when a slot with a controller gets filtered by render checks (not just absent).
+		if (p.controller) {
+			bool filtered = p.lifeState != 0 || p.teamID < 2 || p.health == 0;
+			if (filtered && wasVisible[i]) {
+				std::cout << "[Render]: Slot " << i << " '" << p.name << "' hidden:"
+				          << (p.lifeState != 0 ? " lifeState=" + std::to_string(p.lifeState) : "")
+				          << (p.teamID     < 2 ? " teamID="    + std::to_string(p.teamID)    : "")
+				          << (p.health    == 0 ? " health=0"                                 : "")
+				          << "\n";
+			}
+			if (!filtered && wasFiltered[i])
+				std::cout << "[Render]: Slot " << i << " '" << p.name << "' visible again\n";
+			wasFiltered[i] = filtered;
+		} else {
+			wasFiltered[i] = false;
+		}
+
+		bool visible = p.controller && p.lifeState == 0 && p.teamID >= 2 && p.health > 0;
+		if (!wasVisible[i] && visible)
+			std::cout << "[Render]: Slot " << i << " '" << p.name << "' appeared\n";
+		wasVisible[i] = visible;
+
+		if (!visible) continue;
 
 		float x     = p.position.x;
 		float y     = p.position.y;

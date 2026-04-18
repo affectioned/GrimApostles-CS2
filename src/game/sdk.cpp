@@ -128,15 +128,25 @@ void CGame::update() {
 	getPlayerData();
 	getWeapons();
 
-	// ── Cache restore ──────────────────────────────────────────────────────────
+	// ── Cache restore + drop logging ──────────────────────────────────────────
 	for (int i = 0; i < 64; i++) {
+		bool hadPlayer = isValidPtr(prev[i].controller);
+
 		bool ctrlGarbage = players[i].controller && !isValidPtr(players[i].controller);
 		bool pawnGarbage = players[i].pawn       && !isValidPtr(players[i].pawn);
 		if (ctrlGarbage || pawnGarbage) {
-			if (isValidPtr(prev[i].controller))
+			if (hadPlayer) {
+				std::cout << "[SDK]: Slot " << i << " '" << prev[i].name << "' cache-restored ("
+				          << (ctrlGarbage ? "garbage ctrl" : "garbage pawn") << ")\n";
 				players[i] = prev[i];
+			}
 			continue;
 		}
+
+		// Slot zeroed out — valid prev entry silently dropped by a zero read.
+		if (hadPlayer && !players[i].controller)
+			std::cout << "[SDK]: Slot " << i << " '" << prev[i].name << "' dropped (zero read)\n";
+
 		if (!isValidAscii(players[i].name, sizeof(players[i].name)) &&
 			isValidAscii(prev[i].name, sizeof(prev[i].name)))
 			memcpy(players[i].name, prev[i].name, sizeof(players[i].name));

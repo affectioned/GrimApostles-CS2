@@ -45,6 +45,14 @@ Place alongside the `.exe` at runtime:
 - `src/game/offsets.h/.cpp` — all CS2 struct offsets; auto-updated at startup, hardcoded defaults as fallback
 - `src/game/updater.cpp` — fetches `client_dll.hpp` from a2x/cs2-dumper via WinINet (`fetchURL`), also does signature scanning via `sigscan.cpp`
 
+### DMA reliability and read batching
+The FPGA hardware runs at ~200MB/s; PCIe round-trip latency matters more than bandwidth. Guidelines:
+- **Never use individual `MemReadPtr`/`MemRead` calls in `update()`** — always batch into `PrepareEX` + `ExecuteRead` scatter passes.
+- `update()` is structured as three scatter batches before the entity chain: **Scatter A** (4 module-level offsets), **Scatter B** (one level deep: mapPtr + local player fields + 64 entity chunk pointers), **Scatter C** (mapName + local player name strings).
+- Entity chain passes 2–5 are **guarded** (`if (players[i].listEntry)` etc.) so empty slots don't generate reads.
+- `VMMDLL_FLAG_ZEROPAD_ON_FAIL` handles complete read failures (returns zeros) but not partial/corrupted reads. `sdk.cpp` has `isValidPtr()` and `isValidAscii()` helpers for validation, and `update()` keeps a `prev[64]` snapshot to restore slots where reads return non-zero garbage.
+- **Valid player filter** (both `render.cpp` and `gui.cpp`): `lifeState == 0 && teamID >= 2 && health > 0`. `teamID` and `health` are both on `C_BaseEntity` — the shallowest readable fields. Do not filter by `ping` (too unreliable mid-scatter).
+
 ### Key namespaces (declared in `gui.h`)
 - `gui::` — all rendering, D3D lifecycle, resource loading
 - `maps::` — `mapTextures`, `mapBounds`, radar sizing constants
