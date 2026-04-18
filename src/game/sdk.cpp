@@ -2,10 +2,29 @@
 #include "sdk.h"
 #include "updater.h"
 
+// Returns true for a plausible Windows user-space pointer.
+static bool isValidPtr(uint64_t p) {
+	return p > 0x10000ULL && p < 0x7FFFFFFFFFFF0000ULL;
+}
+
+// Returns true if the string is non-empty and contains only printable ASCII.
+static bool isValidAscii(const char* s, size_t n) {
+	if (!s || !s[0]) return false;
+	for (size_t i = 0; i < n && s[i]; i++) {
+		unsigned char c = (unsigned char)s[i];
+		if (c < 0x20 || c > 0x7E) return false;
+	}
+	return true;
+}
+
 void CGame::update() {
 	// Acquire-load: ensures all class offset writes from fetchClassOffsets() (release-store)
 	// are visible on this thread before we use them in the reads below.
 	(void)updater::classOffsetsReady.load(std::memory_order_acquire);
+
+	// Snapshot last-good player state before getPlayers() zeroes the array.
+	CPlayer prev[64];
+	memcpy(prev, players, sizeof(prev));
 
 	getMap();
 	getLocalPlayer();
@@ -13,6 +32,23 @@ void CGame::update() {
 	getPlayers();
 	getPlayerData();
 	getWeapons();
+
+	// Restore cached data for any slot where the new read produced garbage.
+	// VMMDLL_FLAG_ZEROPAD_ON_FAIL handles full read failures (zeros), but
+	// partial/corrupted reads can produce non-zero garbage addresses.
+	for (int i = 0; i < 64; i++) {
+		bool ctrlGarbage = players[i].controller && !isValidPtr(players[i].controller);
+		bool pawnGarbage = players[i].pawn       && !isValidPtr(players[i].pawn);
+		if (ctrlGarbage || pawnGarbage) {
+			if (isValidPtr(prev[i].controller))
+				players[i] = prev[i];
+			continue;
+		}
+		// Even if pointers look valid, restore name if it came back as garbage.
+		if (!isValidAscii(players[i].name, sizeof(players[i].name)) &&
+			isValidAscii(prev[i].name, sizeof(prev[i].name)))
+			memcpy(players[i].name, prev[i].name, sizeof(players[i].name));
+	}
 }
 
 
@@ -20,63 +56,77 @@ void CGame::update() {
 
 void CGame::getMap() {
 	auto globalVarsPtr = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwGlobalVars);
-	if (!globalVarsPtr) return;
+	if (!isValidPtr(globalVarsPtr)) return;
 
 	uintptr_t mapPtr = DMADevice::MemReadPtr<uint64_t>(globalVarsPtr + 0x0188);
-	if (!mapPtr) return;
+	if (!isValidPtr(mapPtr)) return;
 
 	char newMapName[32] = {};
 	DMADevice::MemRead(mapPtr, newMapName, sizeof(newMapName));
 	newMapName[sizeof(newMapName) - 1] = '\0';
 
-	if (newMapName[0]) {
-		static char prevMap[32] = {};
-		if (strncmp(newMapName, prevMap, sizeof(newMapName)) != 0) {
-			std::cout << "[SDK]: Map -> " << newMapName << "\n";
-			memcpy(prevMap, newMapName, sizeof(newMapName));
-		}
-		memcpy(mapName, newMapName, sizeof(mapName));
+	// Only commit if it looks like a real map name (printable ASCII, starts with "de_"/"cs_" etc.).
+	if (!isValidAscii(newMapName, sizeof(newMapName))) return;
+
+	static char prevMap[32] = {};
+	if (strncmp(newMapName, prevMap, sizeof(newMapName)) != 0) {
+		std::cout << "[SDK]: Map -> " << newMapName << "\n";
+		memcpy(prevMap, newMapName, sizeof(newMapName));
 	}
+	memcpy(mapName, newMapName, sizeof(mapName));
 }
 
 void CGame::getEntityList() {
-	entityList = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwEntityList);
+	uint64_t newEntityList = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwEntityList);
+	if (!isValidPtr(newEntityList)) return;
 
 	static uint64_t prevEntityList = 0;
-	if (entityList != prevEntityList) {
-		std::cout << "[SDK]: Entity list -> 0x" << std::hex << entityList << std::dec << "\n";
-		prevEntityList = entityList;
+	if (newEntityList != prevEntityList) {
+		std::cout << "[SDK]: Entity list -> 0x" << std::hex << newEntityList << std::dec << "\n";
+		prevEntityList = newEntityList;
 	}
+	entityList = newEntityList;
 }
 
 
 // ─── Local player ─────────────────────────────────────────────────────────────
 
 void CGame::getLocalPlayer() {
-	localPlayer.controller = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwLocalPlayerController);
+	uint64_t newController = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwLocalPlayerController);
+
+	// Accept zero (player not in-game) but reject garbage pointers.
+	if (newController && !isValidPtr(newController)) return;
 
 	static uint64_t prevController = 0;
-	if (localPlayer.controller != prevController) {
-		std::cout << "[SDK]: Local controller -> 0x" << std::hex << localPlayer.controller << std::dec << "\n";
-		prevController = localPlayer.controller;
+	if (newController != prevController) {
+		std::cout << "[SDK]: Local controller -> 0x" << std::hex << newController << std::dec << "\n";
+		prevController = newController;
 	}
+	localPlayer.controller = newController;
 	if (!localPlayer.controller) return;
 
-	localPlayer.pawn   = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwLocalPlayerPawn);
+	uint64_t newPawn = DMADevice::MemReadPtr<uint64_t>(DMADevice::moduleBase + client_dll::dwLocalPlayerPawn);
+	if (newPawn && !isValidPtr(newPawn)) return;
+	localPlayer.pawn   = newPawn;
 	localPlayer.teamID = DMADevice::MemReadPtr<uint8_t>(localPlayer.controller + client_dll::C_BaseEntity::m_iTeamNum);
 
 	if (localPlayer.pawn)
 		DMADevice::MemRead(localPlayer.pawn + client_dll::C_BasePlayerPawn::m_vOldOrigin, &localPlayer.position, sizeof(Vector3));
 
 	localPlayer.nameAddr = DMADevice::MemReadPtr<uint64_t>(localPlayer.controller + client_dll::CCSPlayerController::m_sSanitizedPlayerName);
-	if (!localPlayer.nameAddr) return;
+	if (!isValidPtr(localPlayer.nameAddr)) return;
 
-	DMADevice::MemRead(localPlayer.nameAddr, &localPlayer.name, sizeof(localPlayer.name));
-	localPlayer.name[sizeof(localPlayer.name) - 1] = '\0';
+	char newName[32] = {};
+	DMADevice::MemRead(localPlayer.nameAddr, &newName, sizeof(newName));
+	newName[sizeof(newName) - 1] = '\0';
+
+	// Only update name if it looks valid; keep previous on garbage reads.
+	if (!isValidAscii(newName, sizeof(newName))) return;
+	memcpy(localPlayer.name, newName, sizeof(localPlayer.name));
 
 	static char prevName[32] = {};
 	if (strncmp(localPlayer.name, prevName, sizeof(prevName)) != 0) {
-		std::cout << "[SDK]: Local player name -> " << (localPlayer.name[0] ? localPlayer.name : "(empty)") << "\n";
+		std::cout << "[SDK]: Local player name -> " << localPlayer.name << "\n";
 		memcpy(prevName, localPlayer.name, sizeof(prevName));
 	}
 }
