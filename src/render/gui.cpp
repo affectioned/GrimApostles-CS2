@@ -75,14 +75,14 @@ void gui::InitImGui() {
 	h.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) -> void* { return (void*)1; };
 	h.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line) {
 		int i; float f;
-		if      (sscanf(line, "WeaponIcons=%d", &i) == 1) settings::showWeaponIcons = i != 0;
-		else if (sscanf(line, "PlayerNames=%d", &i) == 1) settings::showPlayerNames = i != 0;
-		else if (sscanf(line, "HealthBars=%d",  &i) == 1) settings::showHealthBars  = i != 0;
-		else if (sscanf(line, "AimLines=%d",    &i) == 1) settings::showAimLines    = i != 0;
-		else if (sscanf(line, "TeamPanels=%d",  &i) == 1) settings::showTeamPanels  = i != 0;
-		else if (sscanf(line, "IconScale=%f",   &f) == 1) settings::iconScale       = f;
-		else if (sscanf(line, "AimLength=%f",   &f) == 1) settings::aimLineLength   = f;
-		else if (sscanf(line, "DotRadius=%f",   &f) == 1) settings::dotRadius       = f;
+		if      (sscanf_s(line, "WeaponIcons=%d", &i) == 1) settings::showWeaponIcons = i != 0;
+		else if (sscanf_s(line, "PlayerNames=%d", &i) == 1) settings::showPlayerNames = i != 0;
+		else if (sscanf_s(line, "HealthBars=%d",  &i) == 1) settings::showHealthBars  = i != 0;
+		else if (sscanf_s(line, "AimLines=%d",    &i) == 1) settings::showAimLines    = i != 0;
+		else if (sscanf_s(line, "TeamPanels=%d",  &i) == 1) settings::showTeamPanels  = i != 0;
+		else if (sscanf_s(line, "IconScale=%f",   &f) == 1) settings::iconScale       = f;
+		else if (sscanf_s(line, "AimLength=%f",   &f) == 1) settings::aimLineLength   = f;
+		else if (sscanf_s(line, "DotRadius=%f",   &f) == 1) settings::dotRadius       = f;
 	};
 	h.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* h, ImGuiTextBuffer* buf) {
 		buf->appendf("[%s][Settings]\n", h->TypeName);
