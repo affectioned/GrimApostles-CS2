@@ -25,17 +25,13 @@ bool DMADevice::Connect() {
 		std::cout << "[DMA]: Failed to initialize VMM\n";
 		return false;
 	}
-	hScatter = VMMDLL_Scatter_Initialize(hVMM, dwAttachedProcessId,
-		VMMDLL_FLAG_NOCACHE | VMMDLL_FLAG_NOPAGING | VMMDLL_FLAG_NOCACHEPUT | VMMDLL_FLAG_ZEROPAD_ON_FAIL | VMMDLL_FLAG_NOPAGING_IO);
-
 	ULONG64 id, major, minor;
 	if (!VMMDLL_ConfigGet(hVMM, LC_OPT_FPGA_FPGA_ID, &id) ||
 		!VMMDLL_ConfigGet(hVMM, LC_OPT_FPGA_VERSION_MAJOR, &major) ||
 		!VMMDLL_ConfigGet(hVMM, LC_OPT_FPGA_VERSION_MINOR, &minor)) {
 		std::cout << "[DMA]: Failed to read FPGA config\n";
 		VMMDLL_Close(hVMM);
-		if (hScatter) VMMDLL_Scatter_CloseHandle(hScatter);
-		hVMM = NULL; hScatter = NULL;
+		hVMM = NULL;
 		return false;
 	}
 	std::cout << "[DMA]: FPGA ID=" << id << " v" << major << "." << minor << "\n";
@@ -80,6 +76,14 @@ bool DMADevice::AttachToProcessId() {
 		return false;
 	}
 	std::cout << "[DMA]: Attached to " << kProcess << " (PID: " << dwAttachedProcessId << ")\n";
+
+	if (hScatter) VMMDLL_Scatter_CloseHandle(hScatter);
+	hScatter = VMMDLL_Scatter_Initialize(hVMM, dwAttachedProcessId,
+		VMMDLL_FLAG_NOCACHE | VMMDLL_FLAG_NOPAGING | VMMDLL_FLAG_NOCACHEPUT | VMMDLL_FLAG_ZEROPAD_ON_FAIL | VMMDLL_FLAG_NOPAGING_IO);
+	if (!hScatter) {
+		std::cout << "[DMA]: Failed to initialize scatter handle\n";
+		return false;
+	}
 	return true;
 }
 
