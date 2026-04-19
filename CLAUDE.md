@@ -28,12 +28,13 @@ Place alongside the `.exe` at runtime:
 1. Create Win32 window → init D3D11 → show window → init ImGui
 2. `gui::loadMapBounds()` — populates `maps::mapBounds` with world-space extents per map name
 3. `gui::loadTextures()` — loads all PNGs from disk into DX11 `ID3D11ShaderResourceView*`, stored in `maps::mapTextures` and `icons::iconTextures`
-4. `updater::fetchClassOffsets()` — background thread fetches `client_dll.hpp` from a2x/cs2-dumper, falls back to hardcoded defaults in `src/game/offsets.cpp`
-5. `gui::RunLoop()` — main render loop (blocks until exit)
+4. `updater::fetchClassOffsets()` — background `std::thread` (detached) fetches `client_dll.hpp` from a2x/cs2-dumper; no hardcoded fallbacks (offset stays 0 on failure, reads return zeros)
+5. `DMAThreadMain()` — started as `std::thread` in main; handles connection (with retry) then drives the update loop flat-out
+6. `gui::RunLoop()` — main render loop at 144fps cap (blocks until exit)
 
 ### Source layout
 Follows Valve Source 2 folder naming conventions:
-- `src/tier0/` — platform layer: `dma.h/.cpp` (MemProcFS wrapper), `sigscan.h/.cpp`
+- `src/tier0/` — platform layer: `dma.h/.cpp` (MemProcFS wrapper), `sigscan.h/.cpp`, `dma_thread.h/.cpp` (DMA thread entry point)
 - `src/game/` — game state: `sdk.h/.cpp` (`CGame`, `CPlayer`, `mapData`), `offsets.h/.cpp`, `updater.h/.cpp`
 - `src/game/client/` — CS2 client entity mirrors (one `.h`+`.cpp` per class, named after the CS2 class):
   - `CCSPlayerController.h/.cpp` — controller fields + `Read(base)` (queues scatter reads) + `ReadName()` (reads name string after nameAddr resolves)
@@ -71,9 +72,19 @@ Valid player filter: `p.controllerBase && p.pawn.lifeState == 0 && p.ctrl.teamID
 ### Memory reading
 - `src/tier0/dma.h/.cpp` — `DMADevice` class wrapping MemProcFS; global instance is `g_DMA` (defined in `dma.cpp`). Use `g_DMA.PrepareEX(addr, &val, size)` — no `hScatter` parameter (it's a member). Access state via `g_DMA.bConnected`, `g_DMA.moduleBase`, etc. Static constants (`kProcess`, `kModule`) are accessed as `DMADevice::kProcess`.
 - `src/game/sdk.h` — `CGame` (class), `CPlayer`, `mapData` structs
-- `src/game/sdk.cpp` — `CGame::update()` drives all per-frame memory reads; also contains `getPlayerData()` and `getWeapons()`
-- `src/game/offsets.h/.cpp` — all CS2 struct offsets; auto-updated at startup, hardcoded defaults as fallback
+- `src/game/sdk.cpp` — `CGame::update()` drives all per-frame memory reads; contains `getPlayerData()`, `getCarrier()`, `getBombData()`, `applyCache()`
+- `src/game/offsets.h/.cpp` — all CS2 struct offsets; no hardcoded fallbacks (offset stays 0 on failure)
 - `src/game/updater.cpp` — fetches `client_dll.hpp` from a2x/cs2-dumper via WinINet (`fetchURL`), also does signature scanning via `sigscan.cpp`
+
+### Threading model
+- Single DMA thread: `std::thread` in `main.cpp` calls `DMAThreadMain(game, gameMutex, dmaRun)` — handles connect+retry then update loop
+- Double-buffer: update thread writes to private `CGame local` (heap-allocated via `std::make_unique`), locks briefly to publish `game = *local`; render thread snapshots under the same lock
+- No custom Thread class — plain `std::thread` + `std::atomic<bool> dmaRun`
+- GUI has no connect/disconnect UI — DMA thread auto-connects on startup, retries every 3s on failure
+- `g_DMA.Disconnect()` called on Exit button; DMA thread yields until stop flag fires
+
+### Large stack allocations
+- `CGame` is ~23KB (two `CPlayer[64]` arrays) — always heap-allocate when declaring as a local variable (`std::make_unique<CGame>()`)
 
 ### DMA reliability and read batching
 The FPGA hardware runs at ~200MB/s; PCIe round-trip latency matters more than bandwidth. Guidelines:
@@ -102,4 +113,6 @@ Settings are saved/loaded via ImGui's built-in `.ini` system using a registered 
 ## Offset update strategy
 - Module-level offsets (`dwEntityList`, etc.) are resolved via signature scanning (`updater::sigscanOffsets()`)
 - Class member offsets are fetched from `https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/client_dll.hpp` and parsed with regex
-- Hardcoded fallback values live in `src/game/offsets.cpp`
+- No hardcoded fallbacks — `src/game/offsets.cpp` initialises all offsets to 0; sigscan/fetch fills them at startup
+- `dwGameTypes` (`matchmaking_dll`) was removed — only resolves when in a match, and unused in this codebase
+- Log strings use ASCII hyphens (`-`), not em dashes (`—`), to avoid CP1252/UTF-8 garbling in the Windows console

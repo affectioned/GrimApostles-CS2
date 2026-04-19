@@ -60,6 +60,9 @@
     <ClCompile Include="src\tier0\dma.cpp">
       <Filter>src\tier0</Filter>
     </ClCompile>
+    <ClCompile Include="src\tier0\dma_thread.cpp">
+      <Filter>src\tier0</Filter>
+    </ClCompile>
     <ClCompile Include="src\vgui\gui.cpp">
       <Filter>src\vgui</Filter>
     </ClCompile>
@@ -120,6 +123,9 @@
       <Filter>src\game\client</Filter>
     </ClInclude>
     <ClInclude Include="src\tier0\sigscan.h">
+      <Filter>src\tier0</Filter>
+    </ClInclude>
+    <ClInclude Include="src\tier0\dma_thread.h">
       <Filter>src\tier0</Filter>
     </ClInclude>
     <ClInclude Include="src\tier0\dma.h">

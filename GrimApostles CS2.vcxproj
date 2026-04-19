@@ -205,6 +205,7 @@
     <ClCompile Include="src\game\offsets.cpp" />
     <ClCompile Include="src\tier0\sigscan.cpp" />
     <ClCompile Include="src\tier0\dma.cpp" />
+    <ClCompile Include="src\tier0\dma_thread.cpp" />
     <ClCompile Include="src\game\updater.cpp" />
     <ClCompile Include="src\vgui\gui.cpp" />
     <ClCompile Include="src\vgui\render.cpp" />
@@ -219,6 +220,7 @@
     <ClInclude Include="src\game\client\C_PlantedC4.h" />
     <ClInclude Include="src\game\offsets.h" />
     <ClInclude Include="src\tier0\sigscan.h" />
+    <ClInclude Include="src\tier0\dma_thread.h" />
     <ClInclude Include="src\game\vec.h" />
     <ClInclude Include="src\tier0\dma.h" />
     <ClInclude Include="src\game\updater.h" />

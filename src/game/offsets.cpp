@@ -14,10 +14,6 @@ namespace client_dll {
 	std::ptrdiff_t dwPlantedC4             = 0;
 }
 
-namespace matchmaking_dll {
-	std::ptrdiff_t dwGameTypes = 0;
-}
-
 // ─── client_dll.hpp ───────────────────────────────────────────────────────────
 
 namespace client_dll {
@@ -38,6 +34,7 @@ namespace client_dll {
 		std::ptrdiff_t m_bHasExploded  = 0;
 		std::ptrdiff_t m_bBeingDefused = 0;
 		std::ptrdiff_t m_bBombDefused  = 0;
+		std::ptrdiff_t m_bC4Activated  = 0;
 	}
 
 	namespace C_BasePlayerPawn {

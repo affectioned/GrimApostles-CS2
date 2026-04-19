@@ -7,6 +7,8 @@
 #include "C_PlantedC4.h"
 #include <unordered_map>
 
+static constexpr int kMaxPlayers = 64;
+
 struct mapData {
 	float xBound;
 	float yBound;
@@ -40,15 +42,20 @@ public:
 	CPlayer      localPlayer;
 	char         mapName[32] = {};
 	uintptr_t    entityList  = 0;
-	CPlayer      players[64];
+	CPlayer      players[kMaxPlayers];
 	C_PlantedC4  bomb;
 
 	void update();
 
 private:
+	CPlayer   playerCache[kMaxPlayers];
+	uint32_t  playerCacheAge[64] = {};
+
+	static constexpr uint32_t kMaxCacheAge = 30; // frames before a stale entry expires
+
 	void resolveEntityChain();
 	void getPlayerData();
-	void getWeapons();
 	void getCarrier();
 	void getBombData(uint64_t c4);
+	void applyCache();
 };

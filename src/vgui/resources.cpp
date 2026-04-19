@@ -186,6 +186,6 @@ void gui::loadTextures() {
 	failed += iconFailed;
 	int total = (int)maps::mapTextures.size() + iconLoaded + iconFailed;
 	std::cout << "[Resources]: Loaded " << (total - failed) << "/" << total << " textures";
-	if (failed > 0) std::cout << " (" << failed << " failed — check textures/ folder)";
+	if (failed > 0) std::cout << " (" << failed << " failed - check textures/ folder)";
 	std::cout << "\n";
 }

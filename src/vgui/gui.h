@@ -29,7 +29,7 @@ namespace gui {
 	bool InitD3D();
 	void ShowAppWindow();
 	void InitImGui();
-	void RunLoop();
+	void RunLoop(CGame& game, std::mutex& gameMutex);
 	void Cleanup();
 
 	// D3D helpers (dx11.cpp)

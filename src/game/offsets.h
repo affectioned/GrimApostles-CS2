@@ -12,10 +12,6 @@ namespace client_dll {
 	extern std::ptrdiff_t dwPlantedC4;
 }
 
-namespace matchmaking_dll {
-	extern std::ptrdiff_t dwGameTypes;
-}
-
 // ─── client_dll.hpp  (cs2_dumper::schemas::client_dll::*) ────────────────────
 // Class member offsets. Fetched at startup by updater::fetchClassOffsets().
 
@@ -37,6 +33,7 @@ namespace client_dll {
 		extern std::ptrdiff_t m_bHasExploded;  // bool
 		extern std::ptrdiff_t m_bBeingDefused; // bool
 		extern std::ptrdiff_t m_bBombDefused;  // bool
+		extern std::ptrdiff_t m_bC4Activated;  // bool — distinguishes active planted bomb from stale entity
 	}
 
 	namespace C_BasePlayerPawn {

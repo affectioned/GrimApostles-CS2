@@ -49,7 +49,7 @@ bool updater::fetchClassOffsets() {
 	std::cout << "[Updater]: Fetching client_dll.hpp..." << std::endl;
 	std::string content = fetchURL(CLIENT_DLL_URL);
 	if (content.empty()) {
-		std::cout << "[Updater]: Failed — using defaults for class offsets." << std::endl;
+		std::cout << "[Updater]: Failed - using defaults for class offsets." << std::endl;
 		classOffsetsReady.store(true, std::memory_order_release);
 		return false;
 	}
@@ -89,11 +89,12 @@ bool updater::fetchClassOffsets() {
 	assign(client_dll::C_PlantedC4::m_bHasExploded,                 "C_PlantedC4",              "m_bHasExploded");
 	assign(client_dll::C_PlantedC4::m_bBeingDefused,                "C_PlantedC4",              "m_bBeingDefused");
 	assign(client_dll::C_PlantedC4::m_bBombDefused,                 "C_PlantedC4",              "m_bBombDefused");
+	assign(client_dll::C_PlantedC4::m_bC4Activated,                 "C_PlantedC4",              "m_bC4Activated");
 	// Release-store: all offset writes above are visible to any thread that
 	// subsequently acquire-loads classOffsetsReady.
 	classOffsetsReady.store(true, std::memory_order_release);
 
-	std::cout << "[Updater]: " << updated << "/27 class offsets updated." << std::endl;
+	std::cout << "[Updater]: " << updated << "/28 class offsets updated." << std::endl;
 	return updated > 0;
 }
 
@@ -109,13 +110,12 @@ bool updater::sigscanOffsets() {
 	};
 	auto scan = [&](std::ptrdiff_t& t, const char* mod, const char* sig, const char* name) {
 		if (auto r = FindRIPOffset(mod, sig, 3)) set(t, r, name);
-		else std::cout << "[Updater]: " << name << " — sig not found\n";
+		else std::cout << "[Updater]: " << name << " - sig not found\n";
 	};
 
 	scan(client_dll::dwEntityList,            "client.dll",      "48 89 0D ?? ?? ?? ?? E9 ?? ?? ?? ?? CC",                      "dwEntityList");
 	scan(client_dll::dwLocalPlayerController, "client.dll",      "48 8B 05 ?? ?? ?? ?? 41 89 BE",                               "dwLocalPlayerController");
 	scan(client_dll::dwGlobalVars,            "client.dll",      "48 89 15 ?? ?? ?? ?? 48 89 42",                               "dwGlobalVars");
-	scan(matchmaking_dll::dwGameTypes,        "matchmaking.dll", "48 8D 0D ?? ?? ?? ?? FF 90",                                  "dwGameTypes");
 	scan(client_dll::dwPlantedC4,             "client.dll",      "48 8B 15 ?? ?? ?? ?? 41 FF C0 48 8D 4C 24 ??",               "dwPlantedC4");
 
 	// dwLocalPlayerPawn: rva of dwPrediction global + struct member offset from inner u4 scan
@@ -123,6 +123,6 @@ bool updater::sigscanOffsets() {
 		if (auto off = FindU4InModule("client.dll", "4C 39 B6 ?? ?? ?? ?? 74 ?? 44 88 BE", 3))
 			set(client_dll::dwLocalPlayerPawn, rva + (std::ptrdiff_t)off, "dwLocalPlayerPawn");
 
-	std::cout << "[Updater]: " << updated << "/6 offsets resolved via sigscan." << std::endl;
+	std::cout << "[Updater]: " << updated << "/5 offsets resolved via sigscan." << std::endl;
 	return updated > 0;
 }

@@ -46,3 +46,8 @@ public:
 };
 
 extern DMADevice g_DMA;
+
+// Valid x64 user-space pointer range — rejects nulls, kernel addresses, and DMA zero-pads.
+inline bool isValidPtr(uint64_t p) {
+	return p > 0x10000ULL && p < 0x7FFFFFFFFFFF0000ULL;
+}

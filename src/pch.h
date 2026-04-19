@@ -20,6 +20,8 @@
 #include <iomanip>
 #include <sstream>
 #include <thread>
+#include <mutex>
+#include <atomic>
 #include <filesystem>
 #include <algorithm>
 #include <limits>

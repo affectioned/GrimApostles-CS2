@@ -124,11 +124,10 @@ void gui::InitImGui() {
 	std::cout << "[GUI]: ImGui " << IMGUI_VERSION << " initialized\n";
 }
 
-void gui::RunLoop() {
+void gui::RunLoop(CGame& game, std::mutex& gameMutex) {
 	std::cout << "[GUI]: Render loop started\n";
-	CGame game = {};
-	bool done = false;
 
+	bool done = false;
 	while (!done) {
 		MSG msg;
 		while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
@@ -152,11 +151,15 @@ void gui::RunLoop() {
 		RenderControlPanel();
 
 		if (g_DMA.bConnected) {
-			game.update();
-			gameLoop(game);
+			CGame snapshot;
+			{
+				std::lock_guard<std::mutex> lock(gameMutex);
+				snapshot = game;
+			}
+			gameLoop(snapshot);
 			if (settings::showTeamPanels)
-				RenderTeamPanels(game);
-			RenderBombPanel(game);
+				RenderTeamPanels(snapshot);
+			RenderBombPanel(snapshot);
 		}
 
 		ImGui::Render();
@@ -164,8 +167,9 @@ void gui::RunLoop() {
 		g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
 		g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, black);
 		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-		g_pSwapChain->Present(1, 0);
+		g_pSwapChain->Present(0, 0);
 	}
+
 	std::cout << "[GUI]: Render loop exited\n";
 }
 
@@ -202,51 +206,13 @@ void gui::RenderControlPanel() {
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	// Status indicator + FPS on the same row
-	if (g_DMA.bConnected)
-		ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.5f, 1.0f), "● Connected");
-	else
-		ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "● Disconnected");
-
+	// FPS counter
 	char fpsBuf[16];
 	snprintf(fpsBuf, sizeof(fpsBuf), "%.0f FPS", io.Framerate);
-	ImGui::SameLine(panelW - ImGui::CalcTextSize(fpsBuf).x - 12.0f);
 	ImGui::TextDisabled("%s", fpsBuf);
 
 	ImGui::Spacing();
 	ImGui::Separator();
-	ImGui::Spacing();
-
-	// Connect / Disconnect button
-	if (g_DMA.bConnected) {
-		ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.55f, 0.12f, 0.12f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.72f, 0.20f, 0.20f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.62f, 0.14f, 0.14f, 1.0f));
-		if (ImGui::Button("Disconnect", ImVec2(-1.0f, 28.0f)))
-			g_DMA.Disconnect();
-		ImGui::PopStyleColor(3);
-	} else {
-		ImGui::PushStyleColor(ImGuiCol_Button,        ImVec4(0.12f, 0.45f, 0.22f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.18f, 0.60f, 0.30f, 1.0f));
-		ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.14f, 0.52f, 0.25f, 1.0f));
-		if (ImGui::Button("Connect", ImVec2(-1.0f, 28.0f))) {
-			if (!g_DMA.Connect() || !g_DMA.AttachToProcessId()) {
-				g_DMA.Disconnect();
-			} else {
-				g_DMA.moduleBase = g_DMA.getModuleBase(DMADevice::kModule);
-				if (!g_DMA.moduleBase) {
-					std::cout << "[DMA]: client.dll not found — disconnecting\n";
-					g_DMA.Disconnect();
-				} else {
-					std::cout << "[DMA]: " << DMADevice::kProcess << " PID=" << std::dec << g_DMA.dwAttachedProcessId
-						<< " client.dll=0x" << std::hex << g_DMA.moduleBase << "\n";
-					updater::sigscanOffsets();
-				}
-			}
-		}
-		ImGui::PopStyleColor(3);
-	}
-
 	ImGui::Spacing();
 
 	// Exit — neutral until hovered, then red tint
@@ -493,7 +459,7 @@ void gui::RenderBombPanel(const CGame& game) {
 			ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), kDefusing);
 		}
 
-	} else if (b.isCarried && b.carrierSlot >= 0) {
+	} else if (b.isCarried && b.carrierSlot >= 0 && b.carrierSlot < kMaxPlayers) {
 		// Carried — show who has it
 		const CPlayer& carrier  = game.players[b.carrierSlot];
 		bool           isEnemy  = carrier.ctrl.teamID != game.localPlayer.ctrl.teamID;
