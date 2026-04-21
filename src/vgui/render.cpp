@@ -51,7 +51,7 @@ void gui::renderPlayers(const CGame& game) {
 	ImVec2      windowPos = ImGui::GetWindowPos();
 	const float localZ    = game.localPlayer.pawn.position.z;
 
-	for (int i = 0; i < kMaxPlayers; i++) {
+	for (int i = 0; i < MAX_ENTITIES; i++) {
 		const CPlayer& p = game.players[i];
 
 		bool visible = p.controllerBase && p.pawn.lifeState == 0 && p.ctrl.teamID >= 2 && p.pawn.health > 0;
@@ -134,7 +134,7 @@ void gui::renderBomb(const CGame& game) {
 	const C_PlantedC4& b = game.bomb;
 
 	// Carrier ring -- yellow halo on whoever holds the C4
-	if (b.isCarried && b.carrierSlot >= 0 && b.carrierSlot < kMaxPlayers) {
+	if (b.isCarried && b.carrierSlot >= 0 && b.carrierSlot < MAX_ENTITIES) {
 		const CPlayer& carrier = game.players[b.carrierSlot];
 		if (carrier.controllerBase && carrier.pawn.lifeState == 0) {
 			float x = carrier.pawn.position.x;

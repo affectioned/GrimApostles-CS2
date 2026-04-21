@@ -9,19 +9,30 @@
 #pragma comment(lib, "d3d11")
 
 // STL
-#include <iostream>
-#include <fstream>
 #include <string>
+#include <print>
+#include <fstream>
 #include <cstdio>
 #include <cstdint>
-#include <conio.h>
 #include <unordered_map>
 #include <chrono>
-#include <iomanip>
-#include <sstream>
 #include <thread>
 #include <mutex>
 #include <atomic>
 #include <filesystem>
 #include <algorithm>
 #include <limits>
+#include <functional>
+#include <array>
+#include <vector>
+#include <memory>
+
+// VMM (must follow Windows.h)
+#include "vmmdll.h"
+#pragma comment(lib, "vmm")
+
+// DMA layer — include order is mandatory: Log → DMA → Memory/ScatterRead → Memory/Process.
+#include "DMA/Logging/Log.h"
+#include "DMA/DMA.h"
+#include "DMA/Memory/ScatterRead.h"
+#include "DMA/Memory/Process.h"

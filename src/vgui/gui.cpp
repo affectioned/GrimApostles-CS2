@@ -3,6 +3,8 @@
 #include "sdk.h"
 #include "updater.h"
 
+extern std::atomic<bool> bRunning;
+
 namespace gui {
 	ID3D11Device* g_pd3dDevice = nullptr;
 	ID3D11DeviceContext* g_pd3dDeviceContext = nullptr;
@@ -41,17 +43,17 @@ void gui::CreateAppWindow() {
 	wc = { sizeof(wc), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"GrimApostles", nullptr };
 	::RegisterClassExW(&wc);
 	hwnd = ::CreateWindowExW(WS_EX_APPWINDOW, wc.lpszClassName, L"GrimApostles CS2", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, wc.hInstance, nullptr);
-	std::cout << "[GUI]: Window created\n";
+	Log::Info("[GUI]: Window created");
 }
 
 bool gui::InitD3D() {
 	if (!CreateDeviceD3D(hwnd)) {
 		CleanupDeviceD3D();
 		::UnregisterClassW(wc.lpszClassName, wc.hInstance);
-		std::cout << "[GUI]: Direct3D initialization failed\n";
+		Log::Error("[GUI]: Direct3D initialization failed");
 		return false;
 	}
-	std::cout << "[GUI]: Direct3D initialized\n";
+	Log::Info("[GUI]: Direct3D initialized");
 	return true;
 }
 
@@ -121,11 +123,11 @@ void gui::InitImGui() {
 
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
-	std::cout << "[GUI]: ImGui " << IMGUI_VERSION << " initialized\n";
+	Log::Info("[GUI]: ImGui {} initialized", IMGUI_VERSION);
 }
 
 void gui::RunLoop(CGame& game, std::mutex& gameMutex) {
-	std::cout << "[GUI]: Render loop started\n";
+	Log::Info("[GUI]: Render loop started");
 
 	bool done = false;
 	while (!done) {
@@ -133,7 +135,7 @@ void gui::RunLoop(CGame& game, std::mutex& gameMutex) {
 		while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
 			::TranslateMessage(&msg);
 			::DispatchMessage(&msg);
-			if (msg.message == WM_QUIT || exitRequested) done = true;
+			if (msg.message == WM_QUIT || exitRequested || !bRunning.load(std::memory_order_acquire)) done = true;
 		}
 		if (done) break;
 
@@ -150,7 +152,7 @@ void gui::RunLoop(CGame& game, std::mutex& gameMutex) {
 
 		RenderControlPanel();
 
-		if (g_DMA.bConnected) {
+		if (g_Connected.load(std::memory_order_acquire)) {
 			CGame snapshot;
 			{
 				std::lock_guard<std::mutex> lock(gameMutex);
@@ -170,7 +172,7 @@ void gui::RunLoop(CGame& game, std::mutex& gameMutex) {
 		g_pSwapChain->Present(0, 0);
 	}
 
-	std::cout << "[GUI]: Render loop exited\n";
+	Log::Info("[GUI]: Render loop exited");
 }
 
 void gui::Cleanup() {
@@ -180,7 +182,7 @@ void gui::Cleanup() {
 	CleanupDeviceD3D();
 	::DestroyWindow(hwnd);
 	::UnregisterClassW(wc.lpszClassName, wc.hInstance);
-	g_DMA.ShowKeyPress();
+	Log::Info("[GUI]: Cleanup complete");
 }
 
 void gui::RenderControlPanel() {
@@ -221,7 +223,7 @@ void gui::RenderControlPanel() {
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.60f, 0.10f, 0.10f, 1.0f));
 	if (ImGui::Button("Exit", ImVec2(-1.0f, 22.0f))) {
 		exitRequested = true;
-		g_DMA.Disconnect();
+		bRunning.store(false, std::memory_order_release);
 	}
 	ImGui::PopStyleColor(3);
 
@@ -459,7 +461,7 @@ void gui::RenderBombPanel(const CGame& game) {
 			ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), kDefusing);
 		}
 
-	} else if (b.isCarried && b.carrierSlot >= 0 && b.carrierSlot < kMaxPlayers) {
+	} else if (b.isCarried && b.carrierSlot >= 0 && b.carrierSlot < MAX_ENTITIES) {
 		// Carried — show who has it
 		const CPlayer& carrier  = game.players[b.carrierSlot];
 		bool           isEnemy  = carrier.ctrl.teamID != game.localPlayer.ctrl.teamID;

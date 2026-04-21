@@ -1,128 +1,100 @@
 #include "pch.h"
 #include "updater.h"
 #include "offsets.h"
-#include "sigscan.h"
+#include "DMA/Memory/SigScan.h"
 
-#include <wininet.h>
-#include <regex>
-#pragma comment(lib, "wininet")
-
-static const wchar_t* CLIENT_DLL_URL = L"https://raw.githubusercontent.com/a2x/cs2-dumper/main/output/client_dll.hpp";
-
-std::atomic<bool> updater::classOffsetsReady{false};
-
-static std::string fetchURL(const wchar_t* url) {
-	std::string result;
-	HINTERNET hNet = InternetOpenW(L"GrimApostles", INTERNET_OPEN_TYPE_PRECONFIG, nullptr, nullptr, 0);
-	if (!hNet) return result;
-	HINTERNET hUrl = InternetOpenUrlW(hNet, url, nullptr, 0,
-		INTERNET_FLAG_SECURE | INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
-	if (hUrl) {
-		char buf[4096]; DWORD n = 0;
-		while (InternetReadFile(hUrl, buf, sizeof(buf), &n) && n > 0)
-			result.append(buf, n);
-		InternetCloseHandle(hUrl);
-	}
-	InternetCloseHandle(hNet);
-	return result;
+// ── RIP-relative resolver ──────────────────────────────────────────────────────
+// Resolve a RIP-relative MOV/LEA reference and return the module-relative RVA.
+// sigHit   – absolute address of the first byte of the matched instruction
+// dispOff  – byte offset within the instruction where the 32-bit displacement lives
+// instrSz  – total size of the instruction (RIP advances past it before applying disp)
+// Returns 0 if the resolved address is not readable (false-positive match).
+static ptrdiff_t ResolveRIP(DMA_Connection* Conn, DWORD pid,
+                             uintptr_t clientBase, uint64_t sigHit,
+                             int dispOff, int instrSz)
+{
+    int32_t disp = ReadFromPID<int32_t>(Conn, sigHit + dispOff, pid);
+    uintptr_t absAddr = static_cast<uintptr_t>(sigHit) + instrSz + disp;
+    if (!IsAddressReadable(Conn, absAddr, pid))
+        return 0;
+    return static_cast<ptrdiff_t>(absAddr - clientBase);
 }
 
-using OffsetMap = std::unordered_map<std::string, std::ptrdiff_t>;
+// Scan for sig, resolve the RIP-relative displacement, and write target.
+// Falls back to 'fallback' (pass 0 when no reliable hardcoded RVA is known).
+static void ResolveOffset(DMA_Connection* Conn, DWORD pid, uintptr_t clientBase, uintptr_t clientEnd,
+                           const char* name, ptrdiff_t& target, ptrdiff_t fallback,
+                           const char* sig, int dispOff, int instrSz)
+{
+    uint64_t hit = FindSignature(Conn, sig, clientBase, clientEnd, pid);
+    ptrdiff_t offset = hit ? ResolveRIP(Conn, pid, clientBase, hit, dispOff, instrSz) : 0;
 
-static OffsetMap parseOffsets(const std::string& content) {
-	static const std::regex rx(R"((\w+)\s*=\s*0x([0-9A-Fa-f]+))");
-	OffsetMap map;
-	for (auto it = std::sregex_iterator(content.begin(), content.end(), rx); it != std::sregex_iterator(); ++it)
-		map[(*it)[1].str()] = (std::ptrdiff_t)std::stoull((*it)[2].str(), nullptr, 16);
-	return map;
+    if (offset)
+    {
+        target = offset;
+        Log::Info("[+] {} = 0x{:X}", name, target);
+    }
+    else
+    {
+        target = fallback;
+        Log::Warn("[!] {} sig failed, using fallback 0x{:X}", name, target);
+    }
 }
 
-static std::string getClassBlock(const std::string& content, const char* ns) {
-	std::smatch m;
-	std::regex rx(std::string("namespace ") + ns + R"(\s*\{([^}]*)\})");
-	return std::regex_search(content, m, rx) ? m[1].str() : std::string{};
-}
+// ── sigscanOffsets ────────────────────────────────────────────────────────────
 
-// ─── fetchClassOffsets ────────────────────────────────────────────────────────
+bool updater::sigscanOffsets(DMA_Connection* conn, Process* proc)
+{
+    Log::Info("[Updater]: Scanning RVA pointers...");
 
-bool updater::fetchClassOffsets() {
-	std::cout << "[Updater]: Fetching client_dll.hpp..." << std::endl;
-	std::string content = fetchURL(CLIENT_DLL_URL);
-	if (content.empty()) {
-		std::cout << "[Updater]: Failed - using defaults for class offsets." << std::endl;
-		classOffsetsReady.store(true, std::memory_order_release);
-		return false;
-	}
+    const DWORD     pid        = proc->GetPID();
+    const uintptr_t clientBase = proc->GetModuleBase("client.dll");
+    const uintptr_t clientEnd  = clientBase + proc->GetModuleSize("client.dll");
 
-	int updated = 0;
-	std::unordered_map<std::string, OffsetMap> cache;
-	auto assign = [&](std::ptrdiff_t& t, const char* cls, const char* field) {
-		auto& m = cache[cls];
-		if (m.empty()) m = parseOffsets(getClassBlock(content, cls));
-		if (auto it = m.find(field); it != m.end()) { t = it->second; updated++; }
-	};
+    if (!clientBase)
+    {
+        Log::Error("[Updater]: client.dll base not found, aborting.");
+        return false;
+    }
 
-	assign(client_dll::C_BaseEntity::m_iTeamNum,                    "C_BaseEntity",             "m_iTeamNum");
-	assign(client_dll::C_BaseEntity::m_iHealth,                     "C_BaseEntity",             "m_iHealth");
-	assign(client_dll::C_BaseEntity::m_lifeState,                   "C_BaseEntity",             "m_lifeState");
-	assign(client_dll::C_BasePlayerPawn::m_vOldOrigin,              "C_BasePlayerPawn",         "m_vOldOrigin");
-	assign(client_dll::CCSPlayerController::m_hPlayerPawn,          "CCSPlayerController",      "m_hPlayerPawn");
-	assign(client_dll::CCSPlayerController::m_sSanitizedPlayerName, "CCSPlayerController",      "m_sSanitizedPlayerName");
-	assign(client_dll::CCSPlayerController::m_iCompTeammateColor,   "CCSPlayerController",      "m_iCompTeammateColor");
-	assign(client_dll::CCSPlayerController::m_iPing,                "CCSPlayerController",      "m_iPing");
-	assign(client_dll::CCSPlayerController::m_iPawnArmor,           "CCSPlayerController",      "m_iPawnArmor");
-	assign(client_dll::CCSPlayerController::m_bPawnHasDefuser,      "CCSPlayerController",      "m_bPawnHasDefuser");
-	assign(client_dll::CCSPlayerController::m_bPawnHasHelmet,       "CCSPlayerController",      "m_bPawnHasHelmet");
-	assign(client_dll::C_BasePlayerPawn::m_pWeaponServices,         "C_BasePlayerPawn",         "m_pWeaponServices");
-	assign(client_dll::CPlayer_WeaponServices::m_hMyWeapons,        "CPlayer_WeaponServices",   "m_hMyWeapons");
-	assign(client_dll::C_CSPlayerPawn::m_angEyeAngles,              "C_CSPlayerPawn",           "m_angEyeAngles");
-	assign(client_dll::C_CSPlayerPawn::m_pClippingWeapon,           "C_CSPlayerPawn",           "m_pClippingWeapon");
-	assign(client_dll::C_CSPlayerPawn::m_bIsDefusing,               "C_CSPlayerPawn",           "m_bIsDefusing");
-	assign(client_dll::C_CSPlayerPawn::m_szLastPlaceName,           "C_CSPlayerPawn",           "m_szLastPlaceName");
-	assign(client_dll::C_EconEntity::m_AttributeManager,            "C_EconEntity",             "m_AttributeManager");
-	assign(client_dll::C_AttributeContainer::m_Item,                "C_AttributeContainer",     "m_Item");
-	assign(client_dll::C_EconItemView::m_iItemDefinitionIndex,      "C_EconItemView",           "m_iItemDefinitionIndex");
-	assign(client_dll::C_BaseEntity::m_pGameSceneNode,              "C_BaseEntity",             "m_pGameSceneNode");
-	assign(client_dll::CGameSceneNode::m_vecAbsOrigin,              "CGameSceneNode",           "m_vecAbsOrigin");
-	assign(client_dll::C_PlantedC4::m_bBombTicking,                 "C_PlantedC4",              "m_bBombTicking");
-	assign(client_dll::C_PlantedC4::m_nBombSite,                    "C_PlantedC4",              "m_nBombSite");
-	assign(client_dll::C_PlantedC4::m_bHasExploded,                 "C_PlantedC4",              "m_bHasExploded");
-	assign(client_dll::C_PlantedC4::m_bBeingDefused,                "C_PlantedC4",              "m_bBeingDefused");
-	assign(client_dll::C_PlantedC4::m_bBombDefused,                 "C_PlantedC4",              "m_bBombDefused");
-	assign(client_dll::C_PlantedC4::m_bC4Activated,                 "C_PlantedC4",              "m_bC4Activated");
-	// Release-store: all offset writes above are visible to any thread that
-	// subsequently acquire-loads classOffsetsReady.
-	classOffsetsReady.store(true, std::memory_order_release);
+    int resolved = 0;
 
-	std::cout << "[Updater]: " << updated << "/28 class offsets updated." << std::endl;
-	return updated > 0;
-}
+    auto scanRIP = [&](ptrdiff_t& t, ptrdiff_t fallback,
+                       const char* sig, int dispOff, int instrSz, const char* name) {
+        ResolveOffset(conn, pid, clientBase, clientEnd, name, t, fallback, sig, dispOff, instrSz);
+        if (t) resolved++;
+    };
 
-// ─── sigscanOffsets ───────────────────────────────────────────────────────────
+    // ── Module-level RVA pointers ─────────────────────────────────────────────
+    // All are 7-byte RIP-relative instructions (3-byte opcode+ModRM + 4-byte disp).
 
-bool updater::sigscanOffsets() {
-	std::cout << "[Updater]: Running signature scan for dw* offsets..." << std::endl;
+    scanRIP(client_dll::dwEntityList,            0, "48 89 0D ?? ?? ?? ?? E9 ?? ?? ?? ?? CC",       3, 7, "dwEntityList");
+    scanRIP(client_dll::dwLocalPlayerController, 0, "48 8B 05 ?? ?? ?? ?? 41 89 BE",                3, 7, "dwLocalPlayerController");
+    scanRIP(client_dll::dwGlobalVars,            0, "48 89 15 ?? ?? ?? ?? 48 89 42",                3, 7, "dwGlobalVars");
+    scanRIP(client_dll::dwPlantedC4,             0, "48 8B 15 ?? ?? ?? ?? 41 FF C0 48 8D 4C 24 ??", 3, 7, "dwPlantedC4");
 
-	int updated = 0;
-	auto set  = [&](std::ptrdiff_t& t, std::ptrdiff_t v, const char* name) {
-		t = v; updated++;
-		std::cout << "[Updater]: " << name << " = 0x" << std::hex << v << std::dec << "\n";
-	};
-	auto scan = [&](std::ptrdiff_t& t, const char* mod, const char* sig, const char* name) {
-		if (auto r = FindRIPOffset(mod, sig, 3)) set(t, r, name);
-		else std::cout << "[Updater]: " << name << " - sig not found\n";
-	};
+    // dwLocalPlayerPawn — two-step: resolve the list-entry base RVA then add the pawn field offset.
+    {
+        uint64_t hit = FindSignature(conn,
+            "48 8D 05 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC 40 53 56 41 54",
+            clientBase, clientEnd, pid);
+        ptrdiff_t rva = hit ? ResolveRIP(conn, pid, clientBase, hit, 3, 7) : 0;
 
-	scan(client_dll::dwEntityList,            "client.dll",      "48 89 0D ?? ?? ?? ?? E9 ?? ?? ?? ?? CC",                      "dwEntityList");
-	scan(client_dll::dwLocalPlayerController, "client.dll",      "48 8B 05 ?? ?? ?? ?? 41 89 BE",                               "dwLocalPlayerController");
-	scan(client_dll::dwGlobalVars,            "client.dll",      "48 89 15 ?? ?? ?? ?? 48 89 42",                               "dwGlobalVars");
-	scan(client_dll::dwPlantedC4,             "client.dll",      "48 8B 15 ?? ?? ?? ?? 41 FF C0 48 8D 4C 24 ??",               "dwPlantedC4");
+        uint64_t hit2 = FindSignature(conn, "4C 39 B6 ?? ?? ?? ?? 74 ?? 44 88 BE", clientBase, clientEnd, pid);
+        uint32_t off  = hit2 ? ReadFromPID<uint32_t>(conn, hit2 + 3, pid) : 0;
 
-	// dwLocalPlayerPawn: rva of dwPrediction global + struct member offset from inner u4 scan
-	if (auto rva = FindRIPOffset("client.dll", "48 8D 05 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC 40 53 56 41 54", 3))
-		if (auto off = FindU4InModule("client.dll", "4C 39 B6 ?? ?? ?? ?? 74 ?? 44 88 BE", 3))
-			set(client_dll::dwLocalPlayerPawn, rva + (std::ptrdiff_t)off, "dwLocalPlayerPawn");
+        if (rva && off)
+        {
+            client_dll::dwLocalPlayerPawn = rva + static_cast<ptrdiff_t>(off);
+            Log::Info("[+] dwLocalPlayerPawn = 0x{:X}", client_dll::dwLocalPlayerPawn);
+            resolved++;
+        }
+        else
+        {
+            Log::Warn("[!] dwLocalPlayerPawn sig failed (rva={} off={})", rva != 0, off != 0);
+        }
+    }
 
-	std::cout << "[Updater]: " << updated << "/5 offsets resolved via sigscan." << std::endl;
-	return updated > 0;
+    Log::Info("[Updater]: {}/5 RVA pointers resolved.", resolved);
+    return resolved > 0;
 }

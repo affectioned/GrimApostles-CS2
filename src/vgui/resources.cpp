@@ -123,7 +123,7 @@ void gui::loadMapBounds() {
 			count++;
 		}
 	} catch (const fs::filesystem_error& e) {
-		std::cerr << "[Resources]: Could not scan maps folder: " << e.what() << "\n";
+		Log::Warn("[Resources]: Could not scan maps folder: {}", e.what());
 	}
 
 	// Lower variants: same bounds as the base map but no further sub-level switching
@@ -137,11 +137,11 @@ void gui::loadMapBounds() {
 		}
 	}
 
-	std::cout << "[Resources]: Loaded " << count << " map bounds\n";
+	Log::Info("[Resources]: Loaded {} map bounds", count);
 }
 
 void gui::loadTextures() {
-	std::cout << "[Resources]: Loading textures...\n";
+	Log::Info("[Resources]: Loading textures...");
 	namespace fs = std::filesystem;
 	int failed = 0;
 
@@ -159,7 +159,7 @@ void gui::loadTextures() {
 			if (!maps::mapTextures[mapName]) failed++;
 		}
 	} catch (const fs::filesystem_error& e) {
-		std::cerr << "[Resources]: Could not scan maps folder: " << e.what() << "\n";
+		Log::Warn("[Resources]: Could not scan maps folder: {}", e.what());
 	}
 
 	// Weapon icons -- scan textures/icons/ and load any file whose name is in kWeaponIDs.
@@ -180,12 +180,13 @@ void gui::loadTextures() {
 			else                         iconFailed++;
 		}
 	} catch (const fs::filesystem_error& e) {
-		std::cerr << "[Resources]: Could not scan icons folder: " << e.what() << "\n";
+		Log::Warn("[Resources]: Could not scan icons folder: {}", e.what());
 	}
 
 	failed += iconFailed;
 	int total = (int)maps::mapTextures.size() + iconLoaded + iconFailed;
-	std::cout << "[Resources]: Loaded " << (total - failed) << "/" << total << " textures";
-	if (failed > 0) std::cout << " (" << failed << " failed - check textures/ folder)";
-	std::cout << "\n";
+	if (failed > 0)
+		Log::Warn("[Resources]: Loaded {}/{} textures ({} failed - check textures/ folder)", total - failed, total, failed);
+	else
+		Log::Info("[Resources]: Loaded {}/{} textures", total - failed, total);
 }

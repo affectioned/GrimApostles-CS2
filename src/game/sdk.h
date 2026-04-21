@@ -1,13 +1,12 @@
 #pragma once
-#include "dma.h"
+#include "GameGlobals.h"
+#include "Const/Config.h"
 #include "vec.h"
 #include "offsets.h"
 #include "CCSPlayerController.h"
 #include "C_CSPlayerPawn.h"
 #include "C_PlantedC4.h"
 #include <unordered_map>
-
-static constexpr int kMaxPlayers = 64;
 
 struct mapData {
 	float xBound;
@@ -36,26 +35,22 @@ struct CPlayer {
 };
 
 // ── Game ──────────────────────────────────────────────────────────────────────
+// Pure data class — all DMA reads are driven by CS2Context timer methods.
 
 class CGame {
 public:
 	CPlayer      localPlayer;
 	char         mapName[32] = {};
 	uintptr_t    entityList  = 0;
-	CPlayer      players[kMaxPlayers];
+	CPlayer      players[MAX_ENTITIES];
 	C_PlantedC4  bomb;
 
-	void update();
+	// Apply cache: promotes stale slots from the player cache until they expire.
+	void applyCache();
 
 private:
-	CPlayer   playerCache[kMaxPlayers];
-	uint32_t  playerCacheAge[64] = {};
+	CPlayer  playerCache[MAX_ENTITIES];
+	uint32_t playerCacheAge[MAX_ENTITIES] = {};
 
-	static constexpr uint32_t kMaxCacheAge = 30; // frames before a stale entry expires
-
-	void resolveEntityChain();
-	void getPlayerData();
-	void getCarrier();
-	void getBombData(uint64_t c4);
-	void applyCache();
+	static constexpr uint32_t kMaxCacheAge = 30; // ticks before a stale entry expires
 };

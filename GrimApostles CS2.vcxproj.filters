@@ -54,15 +54,6 @@
     <ClCompile Include="src\game\client\C_CSPlayerPawn.cpp">
       <Filter>src\game\client</Filter>
     </ClCompile>
-    <ClCompile Include="src\tier0\sigscan.cpp">
-      <Filter>src\tier0</Filter>
-    </ClCompile>
-    <ClCompile Include="src\tier0\dma.cpp">
-      <Filter>src\tier0</Filter>
-    </ClCompile>
-    <ClCompile Include="src\tier0\dma_thread.cpp">
-      <Filter>src\tier0</Filter>
-    </ClCompile>
     <ClCompile Include="src\vgui\gui.cpp">
       <Filter>src\vgui</Filter>
     </ClCompile>
@@ -96,6 +87,17 @@
     <ClCompile Include="vendor\imgui\imgui_widgets.cpp">
       <Filter>vendor\imgui</Filter>
     </ClCompile>
+    <ClCompile Include="src\game\CS2Context.cpp" />
+    <ClCompile Include="src\dma\DMA Thread.cpp" />
+    <ClCompile Include="src\dma\DMA.cpp" />
+    <ClCompile Include="src\dma\Input Manager.cpp" />
+    <ClCompile Include="src\dma\Process.cpp" />
+    <ClCompile Include="src\dma\SigScan.cpp" />
+    <ClCompile Include="src\game\client\EntityList.cpp" />
+    <ClCompile Include="src\dma\Input\Input Manager.cpp" />
+    <ClCompile Include="src\dma\Logging\Log.cpp" />
+    <ClCompile Include="src\dma\Memory\Process.cpp" />
+    <ClCompile Include="src\dma\Memory\SigScan.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\pch.h">
@@ -121,15 +123,6 @@
     </ClInclude>
     <ClInclude Include="src\game\client\C_PlantedC4.h">
       <Filter>src\game\client</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tier0\sigscan.h">
-      <Filter>src\tier0</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tier0\dma_thread.h">
-      <Filter>src\tier0</Filter>
-    </ClInclude>
-    <ClInclude Include="src\tier0\dma.h">
-      <Filter>src\tier0</Filter>
     </ClInclude>
     <ClInclude Include="src\vgui\gui.h">
       <Filter>src\vgui</Filter>
@@ -167,6 +160,21 @@
     <ClInclude Include="vendor\vmm\vmmdll.h">
       <Filter>vendor\vmm</Filter>
     </ClInclude>
+    <ClInclude Include="src\game\CS2Context.h" />
+    <ClInclude Include="src\game\GameGlobals.h" />
+    <ClInclude Include="src\game\GameModules.h" />
+    <ClInclude Include="src\dma\DMA Thread.h" />
+    <ClInclude Include="src\dma\DMA.h" />
+    <ClInclude Include="src\dma\IGameContext.h" />
+    <ClInclude Include="src\dma\Input Manager.h" />
+    <ClInclude Include="src\dma\Process.h" />
+    <ClInclude Include="src\dma\ScatterRead.h" />
+    <ClInclude Include="src\dma\SigScan.h" />
+    <ClInclude Include="src\dma\Input\Input Manager.h" />
+    <ClInclude Include="src\dma\Logging\Log.h" />
+    <ClInclude Include="src\dma\Memory\Process.h" />
+    <ClInclude Include="src\dma\Memory\ScatterRead.h" />
+    <ClInclude Include="src\dma\Memory\SigScan.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="vendor\dx\DirectXTK.lib" />
@@ -185,6 +193,7 @@
     <None Include="tools\AssetExtractor\vrf\Source2Viewer-CLI.exe" />
     <None Include="tools\AssetExtractor\vrf\spirv-cross.dll" />
     <None Include="tools\AssetExtractor\vrf\TinyEXRNative.dll" />
+    <None Include="src\dma\base_spec.md" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="tools\AssetExtractor\requirements.txt" />
