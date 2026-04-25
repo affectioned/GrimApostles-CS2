@@ -8,7 +8,6 @@ void CCSPlayerController::Read(uint64_t base) {
 	g_Scatter->Add(base + client_dll::CCSPlayerController::m_sSanitizedPlayerName, &nameAddr);
 	g_Scatter->Add(base + client_dll::C_BaseEntity::m_iTeamNum,                    &teamID);
 	g_Scatter->Add(base + client_dll::CCSPlayerController::m_iCompTeammateColor,   &color);
-	g_Scatter->Add(base + client_dll::CCSPlayerController::m_iPing,                &ping);
 	g_Scatter->Add(base + client_dll::CCSPlayerController::m_iPawnArmor,           &armor);
 	g_Scatter->Add(base + client_dll::CCSPlayerController::m_bPawnHasDefuser,      &hasDefuser);
 	g_Scatter->Add(base + client_dll::CCSPlayerController::m_bPawnHasHelmet,       &hasHelmet);
@@ -25,6 +24,8 @@ void CCSPlayerController::ReadName() {
 
 void CS2Context::t_PlayerCtrl()
 {
+	if (m_Local->localPlayer.controllerBase)
+		m_Local->localPlayer.ctrl.Read(m_Local->localPlayer.controllerBase);
 	for (int i = 0; i < MAX_ENTITIES; i++)
 		if (m_Local->players[i].controllerBase)
 			m_Local->players[i].ctrl.Read(m_Local->players[i].controllerBase);

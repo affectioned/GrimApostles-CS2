@@ -7,6 +7,8 @@ static constexpr float PI = 3.14159265f;
 void gui::gameLoop(const CGame& game) {
 	std::string mapName = game.mapName;
 
+	if (mapName.empty()) return;
+
 	auto boundsIt = maps::mapBounds.find(mapName);
 	if (boundsIt != maps::mapBounds.end()) {
 		float thresh = boundsIt->second.lowerZThreshold;
@@ -54,7 +56,7 @@ void gui::renderPlayers(const CGame& game) {
 	for (int i = 0; i < MAX_ENTITIES; i++) {
 		const CPlayer& p = game.players[i];
 
-		bool visible = p.controllerBase && p.pawn.lifeState == 0 && p.ctrl.teamID >= 2 && p.pawn.health > 0;
+		bool visible = p.controllerBase && p.pawn.lifeState == 0 && p.ctrl.teamID >= TEAM_T;
 		if (!visible) continue;
 
 		float x     = p.pawn.position.x;
@@ -78,7 +80,8 @@ void gui::renderPlayers(const CGame& game) {
 		if (settings::showWeaponIcons && p.ctrl.teamID != game.localPlayer.ctrl.teamID) {
 			int weaponID = p.pawn.activeWeaponID;
 			auto texIt = icons::iconTextures.find(weaponID);
-			if (texIt != icons::iconTextures.end() && texIt->second) {
+			if (texIt != icons::iconTextures.end() && texIt->second
+				&& icons::iconWidths.count(weaponID) && icons::iconHeights.count(weaponID)) {
 				float  iconW   = (float)icons::iconWidths[weaponID]  * settings::iconScale;
 				float  iconH   = (float)icons::iconHeights[weaponID] * settings::iconScale;
 				ImVec2 iconPos = (angle >= 0 && angle <= PI)
@@ -133,9 +136,15 @@ void gui::renderBomb(const CGame& game) {
 	ImVec2 windowPos = ImGui::GetWindowPos();
 	const C_PlantedC4& b = game.bomb;
 
-	// Carrier ring -- yellow halo on whoever holds the C4
-	if (b.isCarried && b.carrierSlot >= 0 && b.carrierSlot < MAX_ENTITIES) {
-		const CPlayer& carrier = game.players[b.carrierSlot];
+	// Carrier/planter ring -- yellow halo on C4 holder, or on the planter while bomb is live.
+	// Hidden on T-side: Ts already know who has/planted the bomb.
+	int highlightSlot = -1;
+	if (game.localPlayer.ctrl.teamID != TEAM_T) {
+		highlightSlot = b.isCarried ? b.carrierSlot
+		              : (b.entity && !b.hasDefused && !b.hasExploded) ? b.planterSlot : -1;
+	}
+	if (highlightSlot >= 0 && highlightSlot < MAX_ENTITIES) {
+		const CPlayer& carrier = game.players[highlightSlot];
 		if (carrier.controllerBase && carrier.pawn.lifeState == 0) {
 			float x = carrier.pawn.position.x;
 			float y = carrier.pawn.position.y;
@@ -163,6 +172,7 @@ void gui::renderBomb(const CGame& game) {
 void gui::worldToRadar(float& x, float& y, const CGame& game) {
 	auto it = maps::mapBounds.find(game.mapName);
 	if (it == maps::mapBounds.end() || it->second.scale == 0.0f) return;
+	if (maps::radarSize < 1.0f) return;
 	mapData data = it->second;
 	x -= data.xBound;
 	y -= data.yBound;

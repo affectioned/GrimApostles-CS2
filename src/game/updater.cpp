@@ -32,12 +32,12 @@ static void ResolveOffset(DMA_Connection* Conn, DWORD pid, uintptr_t clientBase,
     if (offset)
     {
         target = offset;
-        Log::Info("[+] {} = 0x{:X}", name, target);
+        Log::Info("[Updater]: {} = 0x{:X}", name, target);
     }
     else
     {
         target = fallback;
-        Log::Warn("[!] {} sig failed, using fallback 0x{:X}", name, target);
+        Log::Warn("[Updater]: {} sig failed, using fallback 0x{:X}", name, target);
     }
 }
 
@@ -68,30 +68,30 @@ bool updater::sigscanOffsets(DMA_Connection* conn, Process* proc)
     // ── Module-level RVA pointers ─────────────────────────────────────────────
     // All are 7-byte RIP-relative instructions (3-byte opcode+ModRM + 4-byte disp).
 
-    scanRIP(client_dll::dwEntityList,            0, "48 89 0D ?? ?? ?? ?? E9 ?? ?? ?? ?? CC",       3, 7, "dwEntityList");
-    scanRIP(client_dll::dwLocalPlayerController, 0, "48 8B 05 ?? ?? ?? ?? 41 89 BE",                3, 7, "dwLocalPlayerController");
-    scanRIP(client_dll::dwGlobalVars,            0, "48 89 15 ?? ?? ?? ?? 48 89 42",                3, 7, "dwGlobalVars");
-    scanRIP(client_dll::dwPlantedC4,             0, "48 8B 15 ?? ?? ?? ?? 41 FF C0 48 8D 4C 24 ??", 3, 7, "dwPlantedC4");
+    scanRIP(client_dll::dwEntityList,            0, "48 89 0D ? ? ? ? E9 ? ? ? ? CC",       3, 7, "dwEntityList");
+    scanRIP(client_dll::dwLocalPlayerController, 0, "48 8B 05 ? ? ? ? 41 89 BE",                3, 7, "dwLocalPlayerController");
+    scanRIP(client_dll::dwGlobalVars,            0, "48 89 15 ? ? ? ? 48 89 42",                3, 7, "dwGlobalVars");
+    scanRIP(client_dll::dwPlantedC4,             0, "48 8B 15 ? ? ? ? 41 FF C0 48 8D 4C 24 ? 44 89 05 ? ? ? ?", 3, 7, "dwPlantedC4");
 
     // dwLocalPlayerPawn — two-step: resolve the list-entry base RVA then add the pawn field offset.
     {
         uint64_t hit = FindSignature(conn,
-            "48 8D 05 ?? ?? ?? ?? C3 CC CC CC CC CC CC CC CC 40 53 56 41 54",
+            "48 8D 05 ? ? ? ? C3 CC CC CC CC CC CC CC CC 40 53 56 41 54",
             clientBase, clientEnd, pid);
         ptrdiff_t rva = hit ? ResolveRIP(conn, pid, clientBase, hit, 3, 7) : 0;
 
-        uint64_t hit2 = FindSignature(conn, "4C 39 B6 ?? ?? ?? ?? 74 ?? 44 88 BE", clientBase, clientEnd, pid);
+        uint64_t hit2 = FindSignature(conn, "4C 39 B6 ? ? ? ? 74 ? 44 88 BE", clientBase, clientEnd, pid);
         uint32_t off  = hit2 ? ReadFromPID<uint32_t>(conn, hit2 + 3, pid) : 0;
 
         if (rva && off)
         {
             client_dll::dwLocalPlayerPawn = rva + static_cast<ptrdiff_t>(off);
-            Log::Info("[+] dwLocalPlayerPawn = 0x{:X}", client_dll::dwLocalPlayerPawn);
+            Log::Info("[Updater]: dwLocalPlayerPawn = 0x{:X}", client_dll::dwLocalPlayerPawn);
             resolved++;
         }
         else
         {
-            Log::Warn("[!] dwLocalPlayerPawn sig failed (rva={} off={})", rva != 0, off != 0);
+            Log::Warn("[Updater]: dwLocalPlayerPawn sig failed (rva={} off={})", rva != 0, off != 0);
         }
     }
 

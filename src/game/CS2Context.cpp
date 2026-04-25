@@ -45,12 +45,12 @@ bool CS2Context::Initialize(DMA_Connection* conn)
 	// CTimer::m_LastExecutionTime defaults to epoch, so every timer fires on
 	// the very first tick — all state is populated before the render thread
 	// takes its first snapshot.
-	m_Timers.emplace_back(5000ms, [this]{ t_ModulePtrs();      });  // seeds entity list + ptrs
-	m_Timers.emplace_back(1000ms, [this]{ t_MapName();          });  // depends on m_GlobalVarsPtr
-	m_Timers.emplace_back( 500ms, [this]{ t_EntityChain();      });  // depends on entityList
+	m_Timers.emplace_back(1000ms, [this]{ t_ModulePtrs();      });  // seeds entity list + ptrs
+	m_Timers.emplace_back( 100ms, [this]{ t_MapName();          });  // depends on m_GlobalVarsPtr
+	m_Timers.emplace_back( 100ms, [this]{ t_EntityChain();      });  // depends on entityList
 	m_Timers.emplace_back(   8ms, [this]{ t_LocalPlayerPos();   });  // depends on localPlayer.pawnBase
 	m_Timers.emplace_back(   8ms, [this]{ t_PlayerPositions();  });  // depends on pawnBase
-	m_Timers.emplace_back( 150ms, [this]{ t_PlayerCtrl();       });  // depends on controllerBase
+	m_Timers.emplace_back(  50ms, [this]{ t_PlayerCtrl();       });  // depends on controllerBase
 	m_Timers.emplace_back( 100ms, [this]{ t_PlayerWeapons();    });  // depends on activeWeapon
 	m_Timers.emplace_back(5000ms, [this]{ t_PlayerNames();      });  // depends on ctrl.nameAddr
 	m_Timers.emplace_back( 100ms, [this]{ t_CarrierScan();      });  // depends on weaponServicesPtr
@@ -71,9 +71,8 @@ void CS2Context::Tick(DMA_Connection* /*conn*/,
 	m_Game = *m_Local;
 }
 
-// ── t_ModulePtrs — 5000 ms ────────────────────────────────────────────────────
-// Reads module-level global pointers from client.dll. These are static addresses
-// that rarely move mid-session; 5 s refresh is indistinguishable from immediate.
+// ── t_ModulePtrs — 1000 ms ────────────────────────────────────────────────────
+// Reads module-level global pointers from client.dll.
 
 void CS2Context::t_ModulePtrs()
 {
@@ -89,57 +88,123 @@ void CS2Context::t_ModulePtrs()
 	g_Scatter->Execute();
 	g_Scatter->Clear();
 
-	if (newGlobalVars) m_GlobalVarsPtr = newGlobalVars;
-	if (newC4Ptr)      m_PlantedC4Ptr  = newC4Ptr;
+	// Validate pointers: must be non-zero and within Windows user-mode address space.
+	// Garbage values (torn reads mid-write during map transitions) are silently dropped.
+	auto validPtr = [](uint64_t p) { return p > 0x10000 && p < 0x7FFFFFFFFFFF; };
+
+	if (validPtr(newGlobalVars)) m_GlobalVarsPtr = newGlobalVars;
+	if (validPtr(newC4Ptr))      m_PlantedC4Ptr  = newC4Ptr;
 
 	static uint64_t prevEL = 0, prevCtrl = 0;
 
-	if (newEntityList) {
+	if (validPtr(newEntityList)) {
 		if (newEntityList != prevEL) {
 			Log::Info("[SDK]: Entity list -> 0x{:X}", newEntityList);
 			prevEL = newEntityList;
 		}
 		m_Local->entityList = newEntityList;
 	}
-	if (newController) {
+	if (validPtr(newController)) {
 		if (newController != prevCtrl) {
-			Log::Info("[SDK]: Local controller -> 0x{:X}", newController);
+			Log::Info("[SDK]: Local controller -> 0x{:X} (map gen {})", newController, m_MapGeneration + 1);
 			prevCtrl = newController;
+			m_MapGeneration++;
 		}
 		m_Local->localPlayer.controllerBase = newController;
 	}
-	if (newPawn)
+	if (validPtr(newPawn))
 		m_Local->localPlayer.pawnBase = newPawn;
 }
 
-// ── t_MapName — 1000 ms ───────────────────────────────────────────────────────
-// Reads the map name string via globalVars → mapPtr → 32-byte string.
-// Changes only between rounds.
+// ── t_MapName — 100 ms ────────────────────────────────────────────────────────
+// Follows globalVars+activeOff → mapPtr → map name string.
+// On each gen change, resets to the canonical offset 0x188 and forces an
+// immediate scan pass. If 0x188 fails, scans gv+[0x140..0x280] in 8-byte
+// steps every 5 s until a valid pointer to a printable map-prefixed string
+// is found, then sticks to that offset. Logs the found offset so it can be
+// hardcoded if it proves stable.
 
 void CS2Context::t_MapName()
 {
-	if (!m_GlobalVarsPtr) return;
+	using clk = std::chrono::steady_clock;
+	static uint32_t      lastGen   = UINT32_MAX;
+	static clk::time_point lastWait{};
+	static int           activeOff = 0x188;
 
-	uint64_t mapPtr = 0;
-	g_Scatter->Add(m_GlobalVarsPtr + 0x0188, &mapPtr);
-	g_Scatter->Execute();
-	g_Scatter->Clear();
-
-	if (!mapPtr) return;
-
-	char buf[32] = {};
-	g_Scatter->AddRaw(mapPtr, sizeof(buf), buf);
-	g_Scatter->Execute();
-	g_Scatter->Clear();
-
-	buf[sizeof(buf) - 1] = '\0';
-	bool valid = (buf[0] != '\0');
-	for (size_t i = 0; valid && i < sizeof(buf) && buf[i]; i++) {
-		unsigned char c = (unsigned char)buf[i];
-		if (c < 0x20 || c > 0x7E) valid = false;
+	if (m_MapGeneration != lastGen) {
+		Log::Info("[Map]: Generation {} - clearing map name", m_MapGeneration);
+		memset(m_Local->mapName, 0, sizeof(m_Local->mapName));
+		lastGen   = m_MapGeneration;
+		lastWait  = {};     // force immediate scan on first failed tick
+		activeOff = 0x188;
 	}
-	if (valid && strncmp(m_Local->mapName, buf, sizeof(m_Local->mapName)) != 0) {
-		Log::Info("[SDK]: Map -> {}", buf);
-		memcpy(m_Local->mapName, buf, sizeof(m_Local->mapName));
+
+	uint64_t globalVars = 0;
+	g_Scatter->Add(g_ClientBase + client_dll::dwGlobalVars, &globalVars);
+	g_Scatter->Execute();
+	g_Scatter->Clear();
+
+	static uint64_t lastGV = 0;
+	if (globalVars != lastGV) {
+		Log::Info("[Map]: globalVars 0x{:X}", globalVars);
+		lastGV = globalVars;
+	}
+
+	if (!globalVars || globalVars < 0x10000 || globalVars > 0x7FFFFFFFFFFF)
+		return;
+
+	// Try reading map name via a char* pointer at gv+off.
+	// Returns true if a valid, map-prefixed string was found (and updates mapName).
+	static const char* kPrefixes[] = { "de_", "cs_", "ar_", "gg_", "dm_", "dz_" };
+	auto tryPtr = [&](int off) -> bool {
+		uint64_t ptr = 0;
+		g_Scatter->Add(globalVars + off, &ptr);
+		g_Scatter->Execute();
+		g_Scatter->Clear();
+		if (ptr < 0x10000 || ptr > 0x7FFFFFFFFFFF) return false;
+
+		char buf[32] = {};
+		g_Scatter->AddRaw(ptr, sizeof(buf) - 1, buf);
+		g_Scatter->Execute();
+		g_Scatter->Clear();
+		buf[sizeof(buf) - 1] = '\0';
+
+		if (!buf[0]) return false;
+		for (size_t i = 0; buf[i]; i++) {
+			unsigned char c = (unsigned char)buf[i];
+			if (c < 0x20 || c > 0x7E) return false;
+		}
+		bool hasPrefix = false;
+		for (auto p : kPrefixes) if (strncmp(buf, p, 3) == 0) { hasPrefix = true; break; }
+		if (!hasPrefix) return false;
+
+		if (strncmp(m_Local->mapName, buf, sizeof(m_Local->mapName)) != 0) {
+			if (off != 0x188)
+				Log::Info("[Map]: found at gv+0x{:X}: {}", off, buf);
+			else
+				Log::Info("[Map]: -> {}", buf);
+			memcpy(m_Local->mapName, buf, sizeof(m_Local->mapName));
+		}
+		return true;
+	};
+
+	if (tryPtr(activeOff)) return;
+
+	auto now = clk::now();
+	if (now - lastWait < std::chrono::seconds(5)) return;
+	lastWait = now;
+
+	// Log what the failing offset holds, then scan the neighbourhood in case the
+	// offset shifted in a CS2 update. The scan runs every 5 s until the map loads.
+	uint64_t badPtr = 0;
+	g_Scatter->Add(globalVars + activeOff, &badPtr);
+	g_Scatter->Execute();
+	g_Scatter->Clear();
+	Log::Info("[Map]: gen {} gv+0x{:X}=0x{:X} - scanning",
+	          m_MapGeneration, activeOff, badPtr);
+
+	for (int off = 0x140; off <= 0x280; off += 8) {
+		if (off == activeOff) continue;
+		if (tryPtr(off)) { activeOff = off; return; }
 	}
 }

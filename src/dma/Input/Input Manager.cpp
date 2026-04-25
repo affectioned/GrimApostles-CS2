@@ -34,7 +34,7 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 			{
 				if (!VMMDLL_Map_GetModuleFromNameW(Conn->GetHandle(), pid, const_cast<LPWSTR>(L"win32k.sys"), &win32k_module_info, VMMDLL_MODULE_FLAG_NORMAL))
 				{
-					Log::Warn("failed to get module win32k info");
+					Log::Warn("[Input]: Win11 path - win32ksgd.sys/win32k.sys not found in csrss PID {}", pid);
 					return false;
 				}
 			}
@@ -48,7 +48,7 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 				g_session_ptr = FindSignature(Conn, "48 8B 05 ? ? ? ? FF C9", win32k_base, win32k_base + win32k_size, pid);
 				if (!g_session_ptr)
 				{
-					Log::Warn("failed to find g_session_global_slots");
+					Log::Warn("[Input]: Win11 path - g_session_global_slots signature not found in win32k");
 					return false;
 				}
 			}
@@ -75,7 +75,7 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 			PVMMDLL_MAP_MODULEENTRY win32kbase_module_info;
 			if (!VMMDLL_Map_GetModuleFromNameW(Conn->GetHandle(), pid, const_cast<LPWSTR>(L"win32kbase.sys"), &win32kbase_module_info, VMMDLL_MODULE_FLAG_NORMAL))
 			{
-				Log::Warn("failed to get module win32kbase info");
+				Log::Warn("[Input]: Win11 path - win32kbase.sys not found in csrss PID {}", pid);
 				return false;
 			}
 			uintptr_t win32kbase_base = win32kbase_module_info->vaBase;
@@ -91,10 +91,11 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 				session_offset = Deref1;
 
 				gafAsyncKeyStateExport = user_session_state + session_offset;
+				Log::Info("[Input]: Win11 path - gafAsyncKeyStateExport at 0x{:X}", gafAsyncKeyStateExport);
 			}
 			else
 			{
-				Log::Warn("failed to find offset for gafAsyncKeyStateExport");
+				Log::Warn("[Input]: Win11 path - gafAsyncKeyStateExport offset signature not found in win32kbase");
 				return false;
 			}
 
@@ -145,24 +146,24 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 			auto result = VMMDLL_Map_GetModuleFromNameW(Conn->GetHandle(), PID | VMMDLL_PID_PROCESS_WITH_KERNELMEMORY, const_cast<LPWSTR>(L"win32kbase.sys"), &module_info, VMMDLL_MODULE_FLAG_NORMAL);
 			if (!result)
 			{
-				Log::Warn("failed to get module info");
+				Log::Warn("[Input]: Win10 path - failed to get win32kbase.sys module info");
 				return false;
 			}
 
 			char str[261];
 			if (!VMMDLL_PdbLoad(Conn->GetHandle(), PID | VMMDLL_PID_PROCESS_WITH_KERNELMEMORY, module_info->vaBase, str))
 			{
-				Log::Warn("failed to load pdb");
+				Log::Warn("[Input]: Win10 path - failed to load PDB for win32kbase.sys");
 				return false;
 			}
 
 			uintptr_t gafAsyncKeyState;
 			if (!VMMDLL_PdbSymbolAddress(Conn->GetHandle(), str, const_cast<LPSTR>("gafAsyncKeyState"), &gafAsyncKeyState))
 			{
-				Log::Warn("failed to find gafAsyncKeyState");
+				Log::Warn("[Input]: Win10 path - gafAsyncKeyState symbol not found in PDB");
 				return false;
 			}
-			Log::Info("found gafAsyncKeyState at: 0x{:X}", gafAsyncKeyState);
+			Log::Info("[Input]: Win10 path - gafAsyncKeyState at 0x{:X}", gafAsyncKeyState);
 		}
 		if (gafAsyncKeyStateExport > 0x7FFFFFFFFFFF)
 		{
@@ -214,7 +215,7 @@ std::string c_registry::QueryValue(DMA_Connection* Conn, const char* path, e_reg
 
 	if (!VMMDLL_WinReg_QueryValueExU(Conn->GetHandle(), const_cast<LPSTR>(path), &_type, buffer, &size))
 	{
-		Log::Warn("[!] failed QueryValueExU call");
+		Log::Warn("[Input]: Registry read failed: {}", path);
 		return "";
 	}
 	//TODO: implement something nicer & better than this.

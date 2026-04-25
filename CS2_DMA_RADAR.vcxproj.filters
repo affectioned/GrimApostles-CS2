@@ -90,14 +90,11 @@
     <ClCompile Include="src\game\CS2Context.cpp" />
     <ClCompile Include="src\dma\DMA Thread.cpp" />
     <ClCompile Include="src\dma\DMA.cpp" />
-    <ClCompile Include="src\dma\Input Manager.cpp" />
-    <ClCompile Include="src\dma\Process.cpp" />
-    <ClCompile Include="src\dma\SigScan.cpp" />
     <ClCompile Include="src\game\client\EntityList.cpp" />
-    <ClCompile Include="src\dma\Input\Input Manager.cpp" />
-    <ClCompile Include="src\dma\Logging\Log.cpp" />
-    <ClCompile Include="src\dma\Memory\Process.cpp" />
-    <ClCompile Include="src\dma\Memory\SigScan.cpp" />
+    <ClCompile Include="src\dma\input\Input Manager.cpp" />
+    <ClCompile Include="src\dma\logging\Log.cpp" />
+    <ClCompile Include="src\dma\memory\Process.cpp" />
+    <ClCompile Include="src\dma\memory\SigScan.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="src\pch.h">
@@ -166,15 +163,12 @@
     <ClInclude Include="src\dma\DMA Thread.h" />
     <ClInclude Include="src\dma\DMA.h" />
     <ClInclude Include="src\dma\IGameContext.h" />
-    <ClInclude Include="src\dma\Input Manager.h" />
-    <ClInclude Include="src\dma\Process.h" />
-    <ClInclude Include="src\dma\ScatterRead.h" />
-    <ClInclude Include="src\dma\SigScan.h" />
-    <ClInclude Include="src\dma\Input\Input Manager.h" />
-    <ClInclude Include="src\dma\Logging\Log.h" />
-    <ClInclude Include="src\dma\Memory\Process.h" />
-    <ClInclude Include="src\dma\Memory\ScatterRead.h" />
-    <ClInclude Include="src\dma\Memory\SigScan.h" />
+    <ClInclude Include="src\dma\input\Input Manager.h" />
+    <ClInclude Include="src\dma\logging\Log.h" />
+    <ClInclude Include="src\dma\memory\Process.h" />
+    <ClInclude Include="src\dma\memory\ScatterRead.h" />
+    <ClInclude Include="src\dma\memory\SigScan.h" />
+    <ClInclude Include="src\game\Const\Config.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="vendor\dx\DirectXTK.lib" />
@@ -194,6 +188,7 @@
     <None Include="tools\AssetExtractor\vrf\spirv-cross.dll" />
     <None Include="tools\AssetExtractor\vrf\TinyEXRNative.dll" />
     <None Include="src\dma\base_spec.md" />
+    <None Include=".github\workflows\release.yml" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="tools\AssetExtractor\requirements.txt" />

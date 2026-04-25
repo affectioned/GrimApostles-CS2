@@ -40,9 +40,9 @@ namespace settings {
 }
 
 void gui::CreateAppWindow() {
-	wc = { sizeof(wc), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"GrimApostles", nullptr };
+	wc = { sizeof(wc), CS_VREDRAW | CS_HREDRAW, WndProc, 0L, 0L, GetModuleHandle(nullptr), nullptr, nullptr, nullptr, nullptr, L"CS2_DMA_RADAR", nullptr };
 	::RegisterClassExW(&wc);
-	hwnd = ::CreateWindowExW(WS_EX_APPWINDOW, wc.lpszClassName, L"GrimApostles CS2", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, wc.hInstance, nullptr);
+	hwnd = ::CreateWindowExW(WS_EX_APPWINDOW, wc.lpszClassName, L"CS2_DMA_RADAR", WS_POPUP, 0, 0, 0, 0, nullptr, nullptr, wc.hInstance, nullptr);
 	Log::Info("[GUI]: Window created");
 }
 
@@ -67,11 +67,11 @@ void gui::InitImGui() {
 	ImGui::CreateContext();
 
 	// Hook our settings into ImGui's .ini system — loads on first NewFrame(), saves on DestroyContext()
-	ImGui::GetIO().IniFilename = "GrimApostles.ini";
+	ImGui::GetIO().IniFilename = "CS2_DMA_RADAR.ini";
 
 	ImGuiSettingsHandler h;
-	h.TypeName   = "GrimApostles";
-	h.TypeHash   = ImHashStr("GrimApostles");
+	h.TypeName   = "CS2_DMA_RADAR";
+	h.TypeHash   = ImHashStr("CS2_DMA_RADAR");
 	h.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) -> void* { return (void*)1; };
 	h.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line) {
 		int i; float f;
@@ -97,6 +97,19 @@ void gui::InitImGui() {
 		buf->append("\n");
 	};
 	ImGui::AddSettingsHandler(&h);
+
+	// Load a font with broad Unicode coverage (Latin + Cyrillic) for player names
+	{
+		static const ImWchar kRanges[] = {
+			0x0020, 0x00FF,  // Latin Basic + Latin-1 Supplement
+			0x0400, 0x052F,  // Cyrillic + Cyrillic Supplement
+			0,
+		};
+		ImFontConfig cfg;
+		cfg.OversampleH = 1; cfg.OversampleV = 1; cfg.PixelSnapH = true;
+		if (!ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 13.0f, &cfg, kRanges))
+			ImGui::GetIO().Fonts->AddFontDefault();
+	}
 
 	ImGuiStyle& style = ImGui::GetStyle();
 	style.WindowRounding    = 6.0f;
@@ -126,59 +139,63 @@ void gui::InitImGui() {
 	Log::Info("[GUI]: ImGui {} initialized", IMGUI_VERSION);
 }
 
-void gui::RunLoop(CGame& game, std::mutex& gameMutex) {
-	Log::Info("[GUI]: Render loop started");
-
-	bool done = false;
-	while (!done) {
-		MSG msg;
-		while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
-			::TranslateMessage(&msg);
-			::DispatchMessage(&msg);
-			if (msg.message == WM_QUIT || exitRequested || !bRunning.load(std::memory_order_acquire)) done = true;
+void gui::OnFrame(CGame& game, std::mutex& gameMutex) {
+	MSG msg;
+	while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE)) {
+		::TranslateMessage(&msg);
+		::DispatchMessage(&msg);
+		if (msg.message == WM_QUIT) {
+			Log::Info("Exit: WM_QUIT received");
+			bRunning.store(false, std::memory_order_release);
+			return;
 		}
-		if (done) break;
-
-		if (g_ResizeWidth != 0 && g_ResizeHeight != 0) {
-			CleanupRenderTarget();
-			g_pSwapChain->ResizeBuffers(0, g_ResizeWidth, g_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
-			g_ResizeWidth = g_ResizeHeight = 0;
-			CreateRenderTarget();
-		}
-
-		ImGui_ImplDX11_NewFrame();
-		ImGui_ImplWin32_NewFrame();
-		ImGui::NewFrame();
-
-		RenderControlPanel();
-
-		if (g_Connected.load(std::memory_order_acquire)) {
-			CGame snapshot;
-			{
-				std::lock_guard<std::mutex> lock(gameMutex);
-				snapshot = game;
-			}
-			gameLoop(snapshot);
-			if (settings::showTeamPanels)
-				RenderTeamPanels(snapshot);
-			RenderBombPanel(snapshot);
-		}
-
-		ImGui::Render();
-		constexpr float black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
-		g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
-		g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, black);
-		ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-		g_pSwapChain->Present(0, 0);
 	}
 
-	Log::Info("[GUI]: Render loop exited");
+	if (exitRequested) {
+		Log::Info("Exit: exitRequested");
+		bRunning.store(false, std::memory_order_release);
+		return;
+	}
+
+	if (g_ResizeWidth != 0 && g_ResizeHeight != 0) {
+		CleanupRenderTarget();
+		g_pSwapChain->ResizeBuffers(0, g_ResizeWidth, g_ResizeHeight, DXGI_FORMAT_UNKNOWN, 0);
+		g_ResizeWidth = g_ResizeHeight = 0;
+		CreateRenderTarget();
+	}
+
+	ImGui_ImplDX11_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	RenderControlPanel();
+
+	if (g_Connected.load(std::memory_order_acquire)) {
+		CGame snapshot;
+		{
+			std::lock_guard<std::mutex> lock(gameMutex);
+			snapshot = game;
+		}
+		gameLoop(snapshot);
+		if (settings::showTeamPanels)
+			RenderTeamPanels(snapshot);
+		RenderBombPanel(snapshot);
+	}
+
+	ImGui::Render();
+	constexpr float black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, nullptr);
+	g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, black);
+	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+	g_pSwapChain->Present(0, 0);
 }
 
 void gui::Cleanup() {
 	ImGui_ImplDX11_Shutdown();
 	ImGui_ImplWin32_Shutdown();
 	ImGui::DestroyContext();
+	for (auto& [k, v] : maps::mapTextures)  { if (v) { v->Release(); v = nullptr; } }
+	for (auto& [k, v] : icons::iconTextures) { if (v) { v->Release(); v = nullptr; } }
 	CleanupDeviceD3D();
 	::DestroyWindow(hwnd);
 	::UnregisterClassW(wc.lpszClassName, wc.hInstance);
@@ -201,8 +218,8 @@ void gui::RenderControlPanel() {
 	);
 
 	// Title
-	ImGui::SetCursorPosX((panelW - ImGui::CalcTextSize("GrimApostles CS2").x) * 0.5f);
-	ImGui::TextColored(ImVec4(0.5f, 0.78f, 1.0f, 1.0f), "GrimApostles CS2");
+	ImGui::SetCursorPosX((panelW - ImGui::CalcTextSize("CS2_DMA_RADAR").x) * 0.5f);
+	ImGui::TextColored(ImVec4(0.5f, 0.78f, 1.0f, 1.0f), "CS2_DMA_RADAR");
 
 	ImGui::Spacing();
 	ImGui::Separator();
@@ -222,6 +239,7 @@ void gui::RenderControlPanel() {
 	ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.50f, 0.12f, 0.12f, 1.0f));
 	ImGui::PushStyleColor(ImGuiCol_ButtonActive,  ImVec4(0.60f, 0.10f, 0.10f, 1.0f));
 	if (ImGui::Button("Exit", ImVec2(-1.0f, 22.0f))) {
+		Log::Info("Exit: button clicked");
 		exitRequested = true;
 		bRunning.store(false, std::memory_order_release);
 	}
@@ -260,7 +278,7 @@ void gui::RenderControlPanel() {
 
 // ─── Team Panels ──────────────────────────────────────────────────────────────
 
-static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy) {
+static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy, bool isCarrier = false) {
 	constexpr float kDotR   = 5.0f;
 	constexpr float kIndent = kDotR * 2.0f + 8.0f;
 	constexpr float kBarH   = 3.0f;
@@ -338,11 +356,25 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 		ImGui::TextDisabled("%s", p.pawn.lastPlaceName);
 	}
 
-	// Right-aligned: DEFUSING takes priority, otherwise armor/defuser/ping
+	// Right-aligned: DEFUSING > C4 carrier > armor/defuser
 	if (alive && p.pawn.isDefusing) {
 		constexpr const char* kLabel = "DEFUSING";
 		ImGui::SameLine(winW - ImGui::CalcTextSize(kLabel).x - 14.0f);
 		ImGui::TextColored(ImVec4(1.0f, 0.6f, 0.1f, 1.0f), kLabel);
+	} else if (alive && isCarrier) {
+		auto it = icons::iconTextures.find(49);
+		if (it != icons::iconTextures.end() && it->second) {
+			int iw = icons::iconWidths.count(49)  ? icons::iconWidths[49]  : 1;
+			int ih = icons::iconHeights.count(49) ? icons::iconHeights[49] : 1;
+			float iconW = (ih > 0) ? kIconH * (float)iw / (float)ih : kIconH;
+			ImGui::SameLine(winW - iconW - 14.0f);
+			ImGui::Image((ImTextureID)it->second, { iconW, kIconH }, {0,0}, {1,1},
+			             ImVec4(1.0f, 0.88f, 0.0f, 1.0f));
+		} else {
+			constexpr const char* kLabel = "C4";
+			ImGui::SameLine(winW - ImGui::CalcTextSize(kLabel).x - 14.0f);
+			ImGui::TextColored(ImVec4(1.0f, 0.88f, 0.0f, 1.0f), kLabel);
+		}
 	} else {
 		char status[32] = {};
 		if (alive && p.ctrl.armor > 0)
@@ -350,10 +382,6 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy)
 		if (alive && p.ctrl.hasDefuser) {
 			size_t l = strlen(status);
 			snprintf(status + l, sizeof(status) - l, "%sD", l ? " " : "");
-		}
-		if (p.ctrl.ping > 0) {
-			size_t l = strlen(status);
-			snprintf(status + l, sizeof(status) - l, "%s%dms", l ? " " : "", (int)p.ctrl.ping);
 		}
 		if (status[0]) {
 			float sw = ImGui::CalcTextSize(status).x;
@@ -378,7 +406,7 @@ void gui::RenderTeamPanels(const CGame& game) {
 		ImGuiWindowFlags_AlwaysAutoResize  |
 		ImGuiWindowFlags_NoSavedSettings;
 
-	uint8_t myTeam = game.localPlayer.ctrl.teamID;
+	TeamID myTeam = game.localPlayer.ctrl.teamID;
 
 	ImGui::SetNextWindowPos(ImVec2(kPad, kPad), ImGuiCond_Always);
 	ImGui::SetNextWindowSize(ImVec2(kPanelW, 0.0f), ImGuiCond_Always);
@@ -392,8 +420,10 @@ void gui::RenderTeamPanels(const CGame& game) {
 
 	for (int i = 0; i < 64; i++) {
 		const CPlayer& p = game.players[i];
-		if (!p.controllerBase || p.ctrl.teamID < 2 || p.ctrl.teamID == myTeam || p.pawn.health == 0) continue;
-		renderPlayerEntry(p, game, true);
+		if (!p.controllerBase || p.ctrl.teamID < TEAM_T || p.ctrl.teamID == myTeam || p.pawn.health == 0) continue;
+		bool isCarrier = (game.bomb.isCarried && game.bomb.carrierSlot == i)
+		              || (game.bomb.entity && !game.bomb.hasDefused && !game.bomb.hasExploded && game.bomb.planterSlot == i);
+		renderPlayerEntry(p, game, true, isCarrier);
 	}
 	ImGui::End();
 }
@@ -403,8 +433,8 @@ void gui::RenderTeamPanels(const CGame& game) {
 void gui::RenderBombPanel(const CGame& game) {
 	const C_PlantedC4& b = game.bomb;
 
-	// Only show when there is actionable bomb info
-	if (!b.isCarried && !b.entity) return;
+	// Only show when bomb is planted and local player is CT-side
+	if (!b.entity || game.localPlayer.ctrl.teamID == TEAM_T) return;
 
 	constexpr float kPanelW = 200.0f;
 	constexpr float kPad    = 10.0f;
@@ -461,19 +491,6 @@ void gui::RenderBombPanel(const CGame& game) {
 			ImGui::TextColored(ImVec4(0.3f, 0.8f, 1.0f, 1.0f), kDefusing);
 		}
 
-	} else if (b.isCarried && b.carrierSlot >= 0 && b.carrierSlot < MAX_ENTITIES) {
-		// Carried — show who has it
-		const CPlayer& carrier  = game.players[b.carrierSlot];
-		bool           isEnemy  = carrier.ctrl.teamID != game.localPlayer.ctrl.teamID;
-		const char*    label    = isEnemy ? "ENEMY HAS C4" : "TEAM HAS C4";
-		ImVec4         labelCol = isEnemy ? ImVec4(1.0f, 0.4f, 0.4f, 1.0f) : ImVec4(0.3f, 1.0f, 0.5f, 1.0f);
-		ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize(label).x) * 0.5f);
-		ImGui::TextColored(labelCol, "%s", label);
-
-		if (carrier.ctrl.name[0]) {
-			ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize(carrier.ctrl.name).x) * 0.5f);
-			ImGui::TextDisabled("%s", carrier.ctrl.name);
-		}
 	}
 
 	ImGui::Spacing();

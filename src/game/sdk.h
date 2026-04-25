@@ -45,12 +45,4 @@ public:
 	CPlayer      players[MAX_ENTITIES];
 	C_PlantedC4  bomb;
 
-	// Apply cache: promotes stale slots from the player cache until they expire.
-	void applyCache();
-
-private:
-	CPlayer  playerCache[MAX_ENTITIES];
-	uint32_t playerCacheAge[MAX_ENTITIES] = {};
-
-	static constexpr uint32_t kMaxCacheAge = 30; // ticks before a stale entry expires
 };

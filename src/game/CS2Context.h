@@ -23,13 +23,21 @@ private:
 
 	// ── Persistent DMA traversal state ────────────────────────────────────────
 	// These are intermediate addresses not visible to the render thread.
-	uint64_t m_GlobalVarsPtr = 0;  // latched by t_ModulePtrs (5000 ms)
-	uint64_t m_PlantedC4Ptr  = 0;  // latched by t_ModulePtrs (5000 ms)
-	uint64_t m_EntityChunk   = 0;  // latched by t_EntityChain (500 ms)
+	uint64_t m_GlobalVarsPtr    = 0;
+	uint64_t m_PlantedC4Ptr     = 0;
+	uint64_t m_EntityChunk      = 0;
+	// Set on respawn to the previous bomb's m_flC4Blow value. t_BombState suppresses
+	// any entity whose m_flC4Blow matches until a new (different) plant is detected.
+	float    m_SuppressedC4Blow = 0.0f;
+
+	// Incremented by t_ModulePtrs when the local controller pointer changes
+	// (i.e. a new map loaded). Each timer that needs to reset on map change
+	// tracks its own last-seen generation and reacts independently.
+	uint32_t m_MapGeneration  = 0;
 
 	// ── Timer methods ─────────────────────────────────────────────────────────
 	// Registered in dependency order — called sequentially via m_Timers.
-	void t_ModulePtrs();      // 5000 ms — entityList, localController, globalVars, plantedC4Ptr
+	void t_ModulePtrs();      // 1000 ms — entityList, localController, globalVars, plantedC4Ptr
 	void t_MapName();         // 1000 ms — map name string
 	void t_EntityChain();     //  500 ms — 4-pass entity chain resolution
 	void t_LocalPlayerPos();  //    8 ms — local player position
