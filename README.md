@@ -1,12 +1,10 @@
-GrimApostles CS2 Radar
+CS2 DMA Radar
 ---
 A DMA-based radar for Counter-Strike 2 built with ImGui and DirectX 11. Uses PCILeech/MemProcFS to read game memory via FPGA hardware. **Read-only — no writes to game memory.**
 
 **Maintained by affectioned** — GrimApostles no longer maintains this project and has deleted the original repository. This is now an independent continuation, not a fork.
 
 **Questions or feedback? Discord: @grimapostles** (original author)
-
-[Technical documentation](https://github.com/affectioned/GrimApostles-CS2/blob/main/CLAUDE.md)
 
 <img width="2042" height="1305" alt="image" src="https://github.com/user-attachments/assets/ac6f3429-5919-43c7-9649-2d81fef98252" />
 
@@ -21,7 +19,7 @@ A DMA-based radar for Counter-Strike 2 built with ImGui and DirectX 11. Uses PCI
 
 Building
 ---
-Open the `.sln` in **Visual Studio 2022 (v143)**, set **Release x64**, build. Output goes to `bin/Release/`.
+Open `CS2_DMA_RADAR.sln` in **Visual Studio 2022 (v143)**, set **Release x64**, build. Output goes to `bin/Release/`.
 
 Runtime dependencies (place alongside the `.exe`):
 - `vmm.dll`, `leechcore.dll`, `FTD3XX.dll` — from [PCILeech releases](https://github.com/ufrisk/pcileech/releases)

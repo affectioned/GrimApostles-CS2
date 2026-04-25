@@ -19,7 +19,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build Release x64
-        run: msbuild "GrimApostles CS2.sln" /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /m /nologo
+        run: msbuild "CS2_DMA_RADAR.sln" /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /m /nologo
 
       - name: Set version tag
         id: version
@@ -31,6 +31,6 @@ jobs:
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
-          files: bin/Release/GrimApostles CS2.exe
+          files: bin/Release/CS2_DMA_RADAR.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
