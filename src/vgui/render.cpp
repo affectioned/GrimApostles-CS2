@@ -141,7 +141,7 @@ void gui::renderBomb(const CGame& game) {
 	int highlightSlot = -1;
 	if (game.localPlayer.ctrl.teamID != TEAM_T) {
 		highlightSlot = b.isCarried ? b.carrierSlot
-		              : (b.entity && !b.hasDefused && !b.hasExploded) ? b.planterSlot : -1;
+		              : (b.entity && b.isTicking && !b.hasDefused && !b.hasExploded) ? b.planterSlot : -1;
 	}
 	if (highlightSlot >= 0 && highlightSlot < MAX_ENTITIES) {
 		const CPlayer& carrier = game.players[highlightSlot];
@@ -154,8 +154,8 @@ void gui::renderBomb(const CGame& game) {
 		}
 	}
 
-	// Planted bomb dot
-	if (!b.entity || b.hasDefused || b.hasExploded) return;
+	// Planted bomb dot — only render once the bomb is confirmed ticking
+	if (!b.entity || !b.isTicking || b.hasDefused || b.hasExploded) return;
 
 	float bx = b.position.x;
 	float by = b.position.y;

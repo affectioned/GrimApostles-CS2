@@ -40,6 +40,7 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 			}
 			uintptr_t win32k_base = win32k_module_info->vaBase;
 			size_t win32k_size = win32k_module_info->cbImageSize;
+			VMMDLL_MemFree(win32k_module_info);
 			//win32ksgd
 			auto g_session_ptr = FindSignature(Conn, "48 8B 05 ? ? ? ? 48 8B 04 C8", win32k_base, win32k_base + win32k_size, pid);
 			if (!g_session_ptr)
@@ -80,15 +81,14 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 			}
 			uintptr_t win32kbase_base = win32kbase_module_info->vaBase;
 			size_t win32kbase_size = win32kbase_module_info->cbImageSize;
+			VMMDLL_MemFree(win32kbase_module_info);
 
 			//Unsure if this sig will work on all versions. (sig is from PostUpdateKeyStateEvent function. seems to exist in both older version and the new version of win32kbase that I have checked)
 			uintptr_t ptr = FindSignature(Conn, "48 8D 90 ? ? ? ? E8 ? ? ? ? 0F 57 C0", win32kbase_base, win32kbase_base + win32kbase_size, pid);
 			uint32_t session_offset = 0x0;
 			if (ptr)
 			{
-				uintptr_t Deref1 = ReadFromPID<uintptr_t>(Conn, ptr + 3, pid);
-
-				session_offset = Deref1;
+				session_offset = ReadFromPID<uint32_t>(Conn, ptr + 3, pid);
 
 				gafAsyncKeyStateExport = user_session_state + session_offset;
 				Log::Info("[Input]: Win11 path - gafAsyncKeyStateExport at 0x{:X}", gafAsyncKeyStateExport);
@@ -149,9 +149,11 @@ bool c_keys::InitKeyboard(DMA_Connection* Conn)
 				Log::Warn("[Input]: Win10 path - failed to get win32kbase.sys module info");
 				return false;
 			}
+			uintptr_t win32kbase_va = module_info->vaBase;
+			VMMDLL_MemFree(module_info);
 
 			char str[261];
-			if (!VMMDLL_PdbLoad(Conn->GetHandle(), PID | VMMDLL_PID_PROCESS_WITH_KERNELMEMORY, module_info->vaBase, str))
+			if (!VMMDLL_PdbLoad(Conn->GetHandle(), PID | VMMDLL_PID_PROCESS_WITH_KERNELMEMORY, win32kbase_va, str))
 			{
 				Log::Warn("[Input]: Win10 path - failed to load PDB for win32kbase.sys");
 				return false;
@@ -189,7 +191,10 @@ void c_keys::UpdateKeys(DMA_Connection* Conn)
 
 bool c_keys::IsKeyDown(DMA_Connection* Conn, uint32_t virtual_key_code)
 {
-	if (c_keys::IsInitialized() == false)
+	if (!c_keys::IsInitialized())
+		return false;
+
+	if (virtual_key_code >= 256)
 		return false;
 
 	if (gafAsyncKeyStateExport < 0x7FFFFFFFFFFF)
@@ -218,12 +223,29 @@ std::string c_registry::QueryValue(DMA_Connection* Conn, const char* path, e_reg
 		Log::Warn("[Input]: Registry read failed: {}", path);
 		return "";
 	}
-	//TODO: implement something nicer & better than this.
 	if (type == e_registry_type::dword)
 	{
 		DWORD dwordValue = *reinterpret_cast<DWORD*>(buffer);
 		return std::to_string(dwordValue);
 	}
-	std::wstring wstr = std::wstring(reinterpret_cast<wchar_t*>(buffer));
-	return std::string(wstr.begin(), wstr.end());
+
+	// Bound the wstring by the number of wchar_t units actually returned,
+	// then truncate at the first embedded null (registry strings may or may not
+	// include the terminator in the reported size).
+	size_t wcharCount = size / sizeof(wchar_t);
+	std::wstring wstr(reinterpret_cast<wchar_t*>(buffer), wcharCount);
+	if (auto pos = wstr.find(L'\0'); pos != std::wstring::npos)
+		wstr.resize(pos);
+
+	// Use WideCharToMultiByte for a proper UTF-8 conversion.
+	int needed = WideCharToMultiByte(CP_UTF8, 0,
+	                                  wstr.data(), (int)wstr.size(),
+	                                  nullptr, 0, nullptr, nullptr);
+	if (needed <= 0)
+		return "";
+	std::string result(needed, '\0');
+	WideCharToMultiByte(CP_UTF8, 0,
+	                    wstr.data(), (int)wstr.size(),
+	                    result.data(), needed, nullptr, nullptr);
+	return result;
 }

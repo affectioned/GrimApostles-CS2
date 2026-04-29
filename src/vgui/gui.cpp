@@ -339,8 +339,8 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy,
 	if (alive) {
 		auto texIt = icons::iconTextures.find(p.pawn.activeWeaponID);
 		if (texIt != icons::iconTextures.end() && texIt->second) {
-			int iw = icons::iconWidths.count(p.pawn.activeWeaponID)  ? icons::iconWidths[p.pawn.activeWeaponID]  : 1;
-			int ih = icons::iconHeights.count(p.pawn.activeWeaponID) ? icons::iconHeights[p.pawn.activeWeaponID] : 1;
+			int iw = icons::iconWidths.count(p.pawn.activeWeaponID)  ? icons::iconWidths.at(p.pawn.activeWeaponID)  : 1;
+			int ih = icons::iconHeights.count(p.pawn.activeWeaponID) ? icons::iconHeights.at(p.pawn.activeWeaponID) : 1;
 			float iconW = (ih > 0) ? kIconH * (float)iw / (float)ih : kIconH;
 			ImGui::Image((ImTextureID)texIt->second, { iconW, kIconH });
 		} else {
@@ -364,8 +364,8 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy,
 	} else if (alive && isCarrier) {
 		auto it = icons::iconTextures.find(49);
 		if (it != icons::iconTextures.end() && it->second) {
-			int iw = icons::iconWidths.count(49)  ? icons::iconWidths[49]  : 1;
-			int ih = icons::iconHeights.count(49) ? icons::iconHeights[49] : 1;
+			int iw = icons::iconWidths.count(49)  ? icons::iconWidths.at(49)  : 1;
+			int ih = icons::iconHeights.count(49) ? icons::iconHeights.at(49) : 1;
 			float iconW = (ih > 0) ? kIconH * (float)iw / (float)ih : kIconH;
 			ImGui::SameLine(winW - iconW - 14.0f);
 			ImGui::Image((ImTextureID)it->second, { iconW, kIconH }, {0,0}, {1,1},
@@ -418,7 +418,7 @@ void gui::RenderTeamPanels(const CGame& game) {
 	ImGui::Separator();
 	ImGui::Spacing();
 
-	for (int i = 0; i < 64; i++) {
+	for (int i = 0; i < MAX_ENTITIES; i++) {
 		const CPlayer& p = game.players[i];
 		if (!p.controllerBase || p.ctrl.teamID < TEAM_T || p.ctrl.teamID == myTeam || p.pawn.health == 0) continue;
 		bool isCarrier = (game.bomb.isCarried && game.bomb.carrierSlot == i)

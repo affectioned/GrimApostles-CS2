@@ -16,8 +16,8 @@ VMM_HANDLE DMA_Connection::GetHandle() const
 
 bool DMA_Connection::EndConnection()
 {
-	this->~DMA_Connection();
-
+	delete m_Instance;
+	m_Instance = nullptr;
 	return true;
 }
 

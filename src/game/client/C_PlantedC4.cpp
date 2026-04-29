@@ -74,8 +74,7 @@ void CS2Context::t_BombState()
 		m_Local->bomb = {};
 		return;
 	}
-	m_SuppressedC4Blow    = 0.0f;
-	m_Local->bomb.c4Blow  = newC4Blow;
+	m_SuppressedC4Blow = 0.0f;
 
 	// Reject corrupt reads: site must be 0 (A) or 1 (B) once ticking
 	if (newTicking && newSite != 0 && newSite != 1) return;
@@ -96,7 +95,7 @@ void CS2Context::t_BombState()
 	m_Local->bomb.site           = newSite;
 	m_Local->bomb.c4Blow         = newC4Blow;
 
-	if (m_Local->bomb.sceneNode > 0x10000 && m_Local->bomb.sceneNode < 0x7FFFFFFFFFFF) {
+	if (newTicking && m_Local->bomb.sceneNode > 0x10000 && m_Local->bomb.sceneNode < 0x7FFFFFFFFFFF) {
 		g_Scatter->Add(m_Local->bomb.sceneNode + client_dll::CGameSceneNode::m_vecAbsOrigin,
 		               &m_Local->bomb.position);
 		g_Scatter->Execute();

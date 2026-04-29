@@ -36,9 +36,9 @@ int main()
 	gui::loadTextures();
 
 	Log::Info("Starting DMA thread");
-	CGame      game;
+	auto       game = std::make_unique<CGame>();
 	std::mutex gameMutex;
-	g_GameContext = new CS2Context(game, gameMutex);
+	g_GameContext = new CS2Context(*game, gameMutex);
 	std::thread DMAThread(DMA_Thread_Main);
 
 	Log::Info("Render loop running - press END to exit");
@@ -48,14 +48,15 @@ int main()
 			Log::Info("Exit: VK_END pressed");
 			bRunning = false;
 		}
-		gui::OnFrame(game, gameMutex);
+		gui::OnFrame(*game, gameMutex);
 	}
 
 	DMAThread.join();
 
-	gui::Cleanup();
+	delete g_GameContext;
+	g_GameContext = nullptr;
 
-	system("pause");
+	gui::Cleanup();
 
 	Log::Info("Exited cleanly");
 
