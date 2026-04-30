@@ -35,11 +35,28 @@ bool CS2Context::Initialize(DMA_Connection* conn)
 	}
 	Log::Info("[CS2Context]: {} at 0x{:X}", GameModules::ClientDll, g_ClientBase);
 
+	m_Engine2Base = m_Process.GetModuleBase(GameModules::Engine2Dll);
+	if (m_Engine2Base)
+		Log::Info("[CS2Context]: {} at 0x{:X}", GameModules::Engine2Dll, m_Engine2Base);
+	else
+		Log::Warn("[CS2Context]: {} base not found - signOnState/build number unavailable",
+		          GameModules::Engine2Dll);
+
 	m_Scatter = new ScatterRead(conn->GetHandle(), m_Process.GetPID());
 	g_Scatter  = m_Scatter;
 	m_Local    = std::make_unique<CGame>();
 
 	updater::sigscanOffsets(conn, &m_Process);
+
+	// Build-number log lets us cross-check the cs2-dumper snapshot when offsets drift.
+	if (m_Engine2Base) {
+		uint32_t buildNumber = 0;
+		g_Scatter->Add(m_Engine2Base + engine2_dll::dwBuildNumber, &buildNumber);
+		g_Scatter->Execute();
+		g_Scatter->Clear();
+		if (buildNumber)
+			Log::Info("[CS2Context]: CS2 build number: {}", buildNumber);
+	}
 
 	// Register timers in dependency order.
 	// CTimer::m_LastExecutionTime defaults to epoch, so every timer fires on
@@ -53,8 +70,9 @@ bool CS2Context::Initialize(DMA_Connection* conn)
 	m_Timers.emplace_back(  50ms, [this]{ t_PlayerCtrl();       });  // depends on controllerBase
 	m_Timers.emplace_back( 100ms, [this]{ t_PlayerWeapons();    });  // depends on activeWeapon
 	m_Timers.emplace_back(5000ms, [this]{ t_PlayerNames();      });  // depends on ctrl.nameAddr
-	m_Timers.emplace_back( 100ms, [this]{ t_CarrierScan();      });  // depends on weaponServicesPtr
+	m_Timers.emplace_back( 100ms, [this]{ t_CarrierScan();      });  // depends on dwWeaponC4 + entity list
 	m_Timers.emplace_back(  16ms, [this]{ t_BombState();        });  // depends on m_PlantedC4Ptr
+	m_Timers.emplace_back( 500ms, [this]{ t_NetworkState();     });  // depends on m_Engine2Base
 
 	g_Connected.store(true, std::memory_order_release);
 	Log::Info("[CS2Context]: Initialized - {} timers registered", m_Timers.size());
@@ -78,33 +96,46 @@ void CS2Context::t_ModulePtrs()
 {
 	uint64_t base = g_ClientBase;
 	uint64_t newEntityList = 0, newController = 0, newPawn = 0,
-	         newGlobalVars = 0, newC4Ptr = 0;
+	         newGlobalVars = 0, newC4Ptr = 0, newNetworkClient = 0,
+	         newGameRulesProxy = 0;
 
 	g_Scatter->Add(base + client_dll::dwGlobalVars,            &newGlobalVars);
 	g_Scatter->Add(base + client_dll::dwLocalPlayerController, &newController);
 	g_Scatter->Add(base + client_dll::dwLocalPlayerPawn,       &newPawn);
 	g_Scatter->Add(base + client_dll::dwEntityList,            &newEntityList);
 	g_Scatter->Add(base + client_dll::dwPlantedC4,             &newC4Ptr);
+	g_Scatter->Add(base + client_dll::dwGameRules,             &newGameRulesProxy);
+	if (m_Engine2Base)
+		g_Scatter->Add(m_Engine2Base + engine2_dll::dwNetworkGameClient, &newNetworkClient);
 	g_Scatter->Execute();
 	g_Scatter->Clear();
 
-	// Validate pointers: must be non-zero and within Windows user-mode address space.
-	// Garbage values (torn reads mid-write during map transitions) are silently dropped.
-	auto validPtr = [](uint64_t p) { return p > 0x10000 && p < 0x7FFFFFFFFFFF; };
+	// dwGameRules → C_CSGameRulesProxy* → m_pGameRules → C_CSGameRules*.
+	// Resolve once a second; t_BombState reads the rules counter directly off
+	// m_GameRulesPtr without needing the proxy hop on every 16ms tick.
+	if (isValidPtr(newGameRulesProxy)) {
+		uint64_t newRules = 0;
+		g_Scatter->Add(newGameRulesProxy + client_dll::C_CSGameRulesProxy::m_pGameRules, &newRules);
+		g_Scatter->Execute();
+		g_Scatter->Clear();
+		if (isValidPtr(newRules)) m_GameRulesPtr = newRules;
+	}
 
-	if (validPtr(newGlobalVars)) m_GlobalVarsPtr = newGlobalVars;
-	if (validPtr(newC4Ptr))      m_PlantedC4Ptr  = newC4Ptr;
+	if (isValidPtr(newNetworkClient)) m_NetworkClientPtr = newNetworkClient;
+
+	if (isValidPtr(newGlobalVars)) m_GlobalVarsPtr = newGlobalVars;
+	if (isValidPtr(newC4Ptr))      m_PlantedC4Ptr  = newC4Ptr;
 
 	static uint64_t prevEL = 0, prevCtrl = 0;
 
-	if (validPtr(newEntityList)) {
+	if (isValidPtr(newEntityList)) {
 		if (newEntityList != prevEL) {
 			Log::Info("[SDK]: Entity list -> 0x{:X}", newEntityList);
 			prevEL = newEntityList;
 		}
 		m_Local->entityList = newEntityList;
 	}
-	if (validPtr(newController)) {
+	if (isValidPtr(newController)) {
 		if (newController != prevCtrl) {
 			Log::Info("[SDK]: Local controller -> 0x{:X} (map gen {})", newController, m_MapGeneration + 1);
 			prevCtrl = newController;
@@ -112,7 +143,7 @@ void CS2Context::t_ModulePtrs()
 		}
 		m_Local->localPlayer.controllerBase = newController;
 	}
-	if (validPtr(newPawn))
+	if (isValidPtr(newPawn))
 		m_Local->localPlayer.pawnBase = newPawn;
 }
 
@@ -150,7 +181,7 @@ void CS2Context::t_MapName()
 		lastGV = globalVars;
 	}
 
-	if (!globalVars || globalVars < 0x10000 || globalVars > 0x7FFFFFFFFFFF)
+	if (!isValidPtr(globalVars))
 		return;
 
 	// Try reading map name via a char* pointer at gv+off.
@@ -161,7 +192,7 @@ void CS2Context::t_MapName()
 		g_Scatter->Add(globalVars + off, &ptr);
 		g_Scatter->Execute();
 		g_Scatter->Clear();
-		if (ptr < 0x10000 || ptr > 0x7FFFFFFFFFFF) return false;
+		if (!isValidPtr(ptr)) return false;
 
 		char buf[32] = {};
 		g_Scatter->AddRaw(ptr, sizeof(buf) - 1, buf);
@@ -206,5 +237,28 @@ void CS2Context::t_MapName()
 	for (int off = 0x140; off <= 0x280; off += 8) {
 		if (off == activeOff) continue;
 		if (tryPtr(off)) { activeOff = off; return; }
+	}
+}
+
+// 6 = SIGNONSTATE_FULL (in-game). The CNetworkGameClient pointer is refreshed
+// by t_ModulePtrs, so only the 1-byte state field is read here.
+void CS2Context::t_NetworkState()
+{
+	if (!m_NetworkClientPtr) {
+		if (m_Local->signOnState != 0) {
+			Log::Info("[Network]: signOnState {} -> 0 (client null)", m_Local->signOnState);
+			m_Local->signOnState = 0;
+		}
+		return;
+	}
+
+	uint8_t newState = 0;
+	g_Scatter->Add(m_NetworkClientPtr + engine2_dll::dwNetworkGameClient_signOnState, &newState);
+	g_Scatter->Execute();
+	g_Scatter->Clear();
+
+	if (newState != m_Local->signOnState) {
+		Log::Info("[Network]: signOnState {} -> {}", m_Local->signOnState, newState);
+		m_Local->signOnState = newState;
 	}
 }

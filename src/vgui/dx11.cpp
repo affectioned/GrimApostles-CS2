@@ -37,12 +37,26 @@ bool gui::CreateDeviceD3D(HWND hWnd)
 	}
 
 	CreateRenderTarget();
+
+	// Border-address sampler with a transparent-black border. Used by the
+	// rotating-radar quad so off-map corners cleanly fall to alpha=0 rather
+	// than tiling with ImGui's default WRAP sampler.
+	D3D11_SAMPLER_DESC samplerDesc = {};
+	samplerDesc.Filter         = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+	samplerDesc.AddressU       = D3D11_TEXTURE_ADDRESS_BORDER;
+	samplerDesc.AddressV       = D3D11_TEXTURE_ADDRESS_BORDER;
+	samplerDesc.AddressW       = D3D11_TEXTURE_ADDRESS_BORDER;
+	samplerDesc.ComparisonFunc = D3D11_COMPARISON_ALWAYS;
+	samplerDesc.MaxLOD         = D3D11_FLOAT32_MAX;
+	g_pd3dDevice->CreateSamplerState(&samplerDesc, &g_pRadarSampler);
+
 	return true;
 }
 
 void gui::CleanupDeviceD3D()
 {
 	CleanupRenderTarget();
+	if (g_pRadarSampler)     { g_pRadarSampler->Release();     g_pRadarSampler = nullptr; }
 	if (g_pSwapChain)        { g_pSwapChain->Release();        g_pSwapChain = nullptr; }
 	if (g_pd3dDeviceContext) { g_pd3dDeviceContext->Release(); g_pd3dDeviceContext = nullptr; }
 	if (g_pd3dDevice)        { g_pd3dDevice->Release();        g_pd3dDevice = nullptr; }

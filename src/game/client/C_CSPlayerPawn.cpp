@@ -15,25 +15,71 @@ void C_CSPlayerPawn::Read(uint64_t base) {
 }
 
 // ── t_LocalPlayerPos — 8 ms ───────────────────────────────────────────────────
-// Reads only the local player's world position for low-latency self-tracking.
+// Reads the local player's world position and view angles for low-latency
+// self-tracking. eyeAngles is required by the rotated-radar code path — it
+// does NOT come from t_PlayerPositions, which only writes into players[].
 
 void CS2Context::t_LocalPlayerPos()
 {
 	if (!m_Local->localPlayer.pawnBase) return;
 
-	uint8_t curLifeState = 255;
+	uint8_t  curLifeState  = 255;
+	uint64_t observerSvcs  = 0;
 	g_Scatter->Add(m_Local->localPlayer.pawnBase + client_dll::C_BasePlayerPawn::m_vOldOrigin,
 	               &m_Local->localPlayer.pawn.position);
+	g_Scatter->Add(m_Local->localPlayer.pawnBase + client_dll::C_CSPlayerPawn::m_angEyeAngles,
+	               &m_Local->localPlayer.pawn.eyeAngles);
 	g_Scatter->Add(m_Local->localPlayer.pawnBase + client_dll::C_BaseEntity::m_lifeState,
 	               &curLifeState);
+	g_Scatter->Add(m_Local->localPlayer.pawnBase + client_dll::C_BasePlayerPawn::m_pObserverServices,
+	               &observerSvcs);
 	g_Scatter->Execute();
 	g_Scatter->Clear();
 
-	// Dead → alive transition = new round; suppress the stale bomb entity so
-	// t_BombState doesn't re-populate from the old entity (m_bC4Activated and
-	// m_bBombTicking stay true after T-elimination round end). We identify the
-	// stale bomb by its m_flC4Blow value — unique to each plant event — rather
-	// than by pointer (CS2 reuses the same entity address every round).
+	// Spectate-follow: when the local player is dead, our own pawn position
+	// freezes at the corpse, which strands the radar. If we're spectating
+	// someone, resolve their pawn via m_hObserverTarget (CHandle → entity-list
+	// chunk → pawn ptr) and copy their already-tracked position/eyeAngles from
+	// players[] over our own. Three extra scatter executes are unavoidable here
+	// because each step depends on the previous read; only paid while dead.
+	if (curLifeState != 0 && isValidPtr(observerSvcs) && m_Local->entityList) {
+		uint32_t targetHandle = 0;
+		g_Scatter->Add(observerSvcs + client_dll::CPlayer_ObserverServices::m_hObserverTarget,
+		               &targetHandle);
+		g_Scatter->Execute();
+		g_Scatter->Clear();
+
+		if (targetHandle && targetHandle != 0xFFFFFFFF) {
+			uint64_t listEntry = 0;
+			g_Scatter->Add(m_Local->entityList + 0x8 * ((targetHandle & 0x7FFF) >> 9) + 16,
+			               &listEntry);
+			g_Scatter->Execute();
+			g_Scatter->Clear();
+
+			uint64_t targetPawn = 0;
+			if (isValidPtr(listEntry)) {
+				g_Scatter->Add(listEntry + 0x70 * (targetHandle & 0x1FF), &targetPawn);
+				g_Scatter->Execute();
+				g_Scatter->Clear();
+			}
+
+			if (isValidPtr(targetPawn)) {
+				for (size_t i = 0; i < MAX_ENTITIES; i++) {
+					if (m_Local->players[i].pawnBase == targetPawn) {
+						m_Local->localPlayer.pawn.position  = m_Local->players[i].pawn.position;
+						m_Local->localPlayer.pawn.eyeAngles = m_Local->players[i].pawn.eyeAngles;
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	// Dead → alive transition = respawn = new round (fallback path; the
+	// primary round-end signal is m_iRoundEndWinnerTeam handled in t_BombState).
+	// Kept because some round-end paths leave m_bC4Activated/m_bBombTicking
+	// true on the stale entity, and CS2 reuses the same entity address each
+	// round, so we suppress by m_flC4Blow (unique per plant) rather than ptr.
 	static uint8_t prevLifeState = 0;
 	if (prevLifeState != 0 && curLifeState == 0) {
 		m_SuppressedC4Blow = m_Local->bomb.c4Blow;

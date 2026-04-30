@@ -16,7 +16,6 @@ struct C_PlantedC4 {
 
 	bool isCarried   = false;
 	int  carrierSlot = -1;
-	int  planterSlot = -1;
 
 	float c4Blow = 0.0f; // m_flC4Blow: absolute game time of detonation; used as bomb identity
 

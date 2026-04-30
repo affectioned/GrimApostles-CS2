@@ -26,6 +26,10 @@ private:
 	uint64_t m_GlobalVarsPtr    = 0;
 	uint64_t m_PlantedC4Ptr     = 0;
 	uint64_t m_EntityChunk      = 0;
+	uint64_t m_Engine2Base      = 0;   // engine2.dll module base (for build/network reads)
+	uint64_t m_NetworkClientPtr = 0;   // refreshed by t_ModulePtrs, consumed by t_NetworkState
+	uint64_t m_GameRulesPtr     = 0;   // C_CSGameRules* — refreshed by t_ModulePtrs, used by t_BombState
+	int32_t  m_LastRoundEndWinner = 0; // tracks m_iRoundEndWinnerTeam for 0→non-zero transition detection
 	// Set on respawn to the previous bomb's m_flC4Blow value. t_BombState suppresses
 	// any entity whose m_flC4Blow matches until a new (different) plant is detected.
 	float    m_SuppressedC4Blow = 0.0f;
@@ -47,4 +51,5 @@ private:
 	void t_PlayerNames();     // 5000 ms — player name strings
 	void t_CarrierScan();     //  100 ms — C4 carrier detection (pre-plant only)
 	void t_BombState();       //   16 ms — bomb flags, site, defuse timer, position
+	void t_NetworkState();    //  500 ms — engine2.dll signOnState
 };

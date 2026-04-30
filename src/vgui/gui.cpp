@@ -11,6 +11,7 @@ namespace gui {
 	IDXGISwapChain* g_pSwapChain = nullptr;
 	UINT g_ResizeWidth = 0, g_ResizeHeight = 0;
 	ID3D11RenderTargetView* g_mainRenderTargetView = nullptr;
+	ID3D11SamplerState* g_pRadarSampler = nullptr;
 	bool exitRequested = false;
 	WNDCLASSEXW wc = {};
 	HWND hwnd = nullptr;
@@ -29,14 +30,16 @@ namespace icons {
 }
 
 namespace settings {
-	bool  showWeaponIcons = false;
-	bool  showPlayerNames = false;
-	bool  showHealthBars  = false;
-	bool  showAimLines    = true;
-	bool  showTeamPanels  = true;
-	float iconScale       = 0.2f;
-	float aimLineLength   = 40.0f;
-	float dotRadius       = 6.0f;
+	bool  showAimLinesEnemies    = true,  showAimLinesFriendlies    = false;
+	bool  showWeaponIconsEnemies = true,  showWeaponIconsFriendlies = false;
+	bool  showHealthBarsEnemies  = true,  showHealthBarsFriendlies  = false;
+	bool  showPlayerNamesEnemies = false, showPlayerNamesFriendlies = false;
+	bool  showTeamPanels         = true;
+	bool  rotateRadar            = true;
+	float iconScale              = 0.2f;
+	float aimLineLength          = 40.0f;
+	float dotRadius              = 8.0f;
+	float radarZoom              = 0.7f;
 }
 
 void gui::CreateAppWindow() {
@@ -73,27 +76,45 @@ void gui::InitImGui() {
 	h.TypeName   = "CS2_DMA_RADAR";
 	h.TypeHash   = ImHashStr("CS2_DMA_RADAR");
 	h.ReadOpenFn = [](ImGuiContext*, ImGuiSettingsHandler*, const char*) -> void* { return (void*)1; };
+	struct BoolKey  { const char* key; bool*  val; };
+	struct FloatKey { const char* key; float* val; };
+	static const BoolKey kBoolKeys[] = {
+		{ "AimLinesEnemies",       &settings::showAimLinesEnemies    },
+		{ "AimLinesFriendlies",    &settings::showAimLinesFriendlies },
+		{ "WeaponIconsEnemies",    &settings::showWeaponIconsEnemies },
+		{ "WeaponIconsFriendlies", &settings::showWeaponIconsFriendlies },
+		{ "HealthBarsEnemies",     &settings::showHealthBarsEnemies  },
+		{ "HealthBarsFriendlies",  &settings::showHealthBarsFriendlies },
+		{ "PlayerNamesEnemies",    &settings::showPlayerNamesEnemies },
+		{ "PlayerNamesFriendlies", &settings::showPlayerNamesFriendlies },
+		{ "TeamPanels",            &settings::showTeamPanels         },
+		{ "RotateRadar",           &settings::rotateRadar            },
+	};
+	static const FloatKey kFloatKeys[] = {
+		{ "IconScale",  &settings::iconScale     },
+		{ "AimLength",  &settings::aimLineLength },
+		{ "DotRadius",  &settings::dotRadius     },
+		{ "RadarZoom",  &settings::radarZoom     },
+	};
+
 	h.ReadLineFn = [](ImGuiContext*, ImGuiSettingsHandler*, void*, const char* line) {
-		int i; float f;
-		if      (sscanf_s(line, "WeaponIcons=%d", &i) == 1) settings::showWeaponIcons = i != 0;
-		else if (sscanf_s(line, "PlayerNames=%d", &i) == 1) settings::showPlayerNames = i != 0;
-		else if (sscanf_s(line, "HealthBars=%d",  &i) == 1) settings::showHealthBars  = i != 0;
-		else if (sscanf_s(line, "AimLines=%d",    &i) == 1) settings::showAimLines    = i != 0;
-		else if (sscanf_s(line, "TeamPanels=%d",  &i) == 1) settings::showTeamPanels  = i != 0;
-		else if (sscanf_s(line, "IconScale=%f",   &f) == 1) settings::iconScale       = f;
-		else if (sscanf_s(line, "AimLength=%f",   &f) == 1) settings::aimLineLength   = f;
-		else if (sscanf_s(line, "DotRadius=%f",   &f) == 1) settings::dotRadius       = f;
+		for (const auto& k : kBoolKeys) {
+			char fmt[64];
+			snprintf(fmt, sizeof(fmt), "%s=%%d", k.key);
+			int i;
+			if (sscanf_s(line, fmt, &i) == 1) { *k.val = (i != 0); return; }
+		}
+		for (const auto& k : kFloatKeys) {
+			char fmt[64];
+			snprintf(fmt, sizeof(fmt), "%s=%%f", k.key);
+			float f;
+			if (sscanf_s(line, fmt, &f) == 1) { *k.val = f; return; }
+		}
 	};
 	h.WriteAllFn = [](ImGuiContext*, ImGuiSettingsHandler* h, ImGuiTextBuffer* buf) {
 		buf->appendf("[%s][Settings]\n", h->TypeName);
-		buf->appendf("WeaponIcons=%d\n", settings::showWeaponIcons);
-		buf->appendf("PlayerNames=%d\n", settings::showPlayerNames);
-		buf->appendf("HealthBars=%d\n",  settings::showHealthBars);
-		buf->appendf("AimLines=%d\n",    settings::showAimLines);
-		buf->appendf("TeamPanels=%d\n",  settings::showTeamPanels);
-		buf->appendf("IconScale=%.3f\n", settings::iconScale);
-		buf->appendf("AimLength=%.1f\n", settings::aimLineLength);
-		buf->appendf("DotRadius=%.2f\n", settings::dotRadius);
+		for (const auto& k : kBoolKeys)  buf->appendf("%s=%d\n",   k.key, *k.val);
+		for (const auto& k : kFloatKeys) buf->appendf("%s=%.3f\n", k.key, *k.val);
 		buf->append("\n");
 	};
 	ImGui::AddSettingsHandler(&h);
@@ -105,9 +126,19 @@ void gui::InitImGui() {
 			0x0400, 0x052F,  // Cyrillic + Cyrillic Supplement
 			0,
 		};
+		// 16px Segoe UI Semibold — the radar runs on a second-monitor DMA box,
+		// so glance-readability matters more than a tight UI. Microsoft uses
+		// the truncated "segui" prefix for the semibold/light variants
+		// (seguisb.ttf, not segoeuisb.ttf). Try semibold first; fall back to
+		// regular, then to ImGui's bitmap font if neither system font loads.
 		ImFontConfig cfg;
 		cfg.OversampleH = 1; cfg.OversampleV = 1; cfg.PixelSnapH = true;
-		if (!ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", 13.0f, &cfg, kRanges))
+		constexpr float kFontPx = 16.0f;
+		ImFont* font =
+			ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\seguisb.ttf", kFontPx, &cfg, kRanges);
+		if (!font)
+			font = ImGui::GetIO().Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\segoeui.ttf", kFontPx, &cfg, kRanges);
+		if (!font)
 			ImGui::GetIO().Fonts->AddFontDefault();
 	}
 
@@ -206,15 +237,15 @@ void gui::RenderControlPanel() {
 	ImGuiIO& io = ImGui::GetIO();
 	constexpr float panelW = 220.0f;
 
-	ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW - 10.0f, 10.0f), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(ImVec2(panelW, 0.0f), ImGuiCond_Always);
+	// FirstUseEver on the anchor lets the user drag the panel and have ImGui
+	// persist the chosen position via its built-in [Window][##panel] section.
+	ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - panelW - 10.0f, 10.0f), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(panelW, 0.0f), ImGuiCond_FirstUseEver);
 	ImGui::Begin("##panel", nullptr,
 		ImGuiWindowFlags_NoTitleBar        |
 		ImGuiWindowFlags_NoResize          |
-		ImGuiWindowFlags_NoMove            |
 		ImGuiWindowFlags_NoScrollbar       |
-		ImGuiWindowFlags_AlwaysAutoResize  |
-		ImGuiWindowFlags_NoSavedSettings
+		ImGuiWindowFlags_AlwaysAutoResize
 	);
 
 	// Title
@@ -253,11 +284,34 @@ void gui::RenderControlPanel() {
 	if (ImGui::CollapsingHeader("Settings")) {
 		ImGui::Spacing();
 
-		ImGui::Checkbox("Weapon Icons", &settings::showWeaponIcons);
-		ImGui::Checkbox("Player Names", &settings::showPlayerNames);
-		ImGui::Checkbox("Health Bars",  &settings::showHealthBars);
-		ImGui::Checkbox("Aim Lines",    &settings::showAimLines);
+		if (ImGui::BeginTable("##esp", 3,
+		    ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_NoSavedSettings))
+		{
+			ImGui::TableSetupColumn("");
+			ImGui::TableSetupColumn("Enemies");
+			ImGui::TableSetupColumn("Friendlies");
+			ImGui::TableHeadersRow();
+
+			auto row = [](const char* label, bool* enem, bool* friendly,
+			              const char* idEnem, const char* idFriend) {
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::AlignTextToFramePadding();
+				ImGui::TextUnformatted(label);
+				ImGui::TableNextColumn(); ImGui::Checkbox(idEnem,   enem);
+				ImGui::TableNextColumn(); ImGui::Checkbox(idFriend, friendly);
+			};
+
+			row("Aim Lines",    &settings::showAimLinesEnemies,    &settings::showAimLinesFriendlies,    "##aim_e",  "##aim_f");
+			row("Weapon Icons", &settings::showWeaponIconsEnemies, &settings::showWeaponIconsFriendlies, "##wpn_e",  "##wpn_f");
+			row("Health Bars",  &settings::showHealthBarsEnemies,  &settings::showHealthBarsFriendlies,  "##hp_e",   "##hp_f");
+			row("Player Names", &settings::showPlayerNamesEnemies, &settings::showPlayerNamesFriendlies, "##name_e", "##name_f");
+			ImGui::EndTable();
+		}
+
+		ImGui::Spacing();
 		ImGui::Checkbox("Team Panels",  &settings::showTeamPanels);
+		ImGui::Checkbox("Rotate Radar", &settings::rotateRadar);
 
 		ImGui::Spacing();
 		ImGui::Separator();
@@ -269,6 +323,8 @@ void gui::RenderControlPanel() {
 		ImGui::SliderFloat("##aimlength", &settings::aimLineLength, 10.0f, 100.0f, "Aim  %.0fpx");
 		ImGui::SetNextItemWidth(-1.0f);
 		ImGui::SliderFloat("##dotradius", &settings::dotRadius,     3.0f,  14.0f,  "Dot  %.1fpx");
+		ImGui::SetNextItemWidth(-1.0f);
+		ImGui::SliderFloat("##zoom",      &settings::radarZoom,    0.5f,  3.0f,   "Zoom  %.2fx");
 
 		ImGui::Spacing();
 	}
@@ -293,12 +349,11 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy,
 
 	// Dot
 	ImU32 dotCol;
-	if      (p.controllerBase == game.localPlayer.controllerBase) dotCol = IM_COL32(255, 255, 255, (int)(alpha * 255));
-	else if (!isEnemy)                                             dotCol = gui::setColor(p.ctrl.color, alpha * 255.0f);
+	if (!isEnemy)                                             dotCol = gui::setColor(p.ctrl.color, alpha * 255.0f);
 	else                                                           dotCol = IM_COL32(255, 60,  60,  (int)(alpha * 255));
 
 	ImVec2 dotCtr = { origin.x + kDotR + 2.0f, origin.y + lineH * 0.5f + 1.0f };
-	dl->AddCircleFilled(dotCtr, kDotR + 1.0f, IM_COL32(0, 0, 0, (int)(alpha * 180)));
+	//dl->AddCircleFilled(dotCtr, kDotR + 1.0f, IM_COL32(0, 0, 0, (int)(alpha * 180)));
 	dl->AddCircleFilled(dotCtr, kDotR,         dotCol);
 
 	// Name (left) + HP number (right)
@@ -368,8 +423,9 @@ static void renderPlayerEntry(const CPlayer& p, const CGame& game, bool isEnemy,
 			int ih = icons::iconHeights.count(49) ? icons::iconHeights.at(49) : 1;
 			float iconW = (ih > 0) ? kIconH * (float)iw / (float)ih : kIconH;
 			ImGui::SameLine(winW - iconW - 14.0f);
-			ImGui::Image((ImTextureID)it->second, { iconW, kIconH }, {0,0}, {1,1},
-			             ImVec4(1.0f, 0.88f, 0.0f, 1.0f));
+			// v1.91.9 dropped the tint_col arg from Image(); ImageWithBg replaces it
+			// (signature: texture, size, uv0, uv1, bg_col, tint_col).
+			ImGui::ImageWithBg((ImTextureID)it->second, { iconW, kIconH }, {0,0}, {1,1},ImVec4(0,0,0,0), ImVec4(1.0f, 0.88f, 0.0f, 1.0f));
 		} else {
 			constexpr const char* kLabel = "C4";
 			ImGui::SameLine(winW - ImGui::CalcTextSize(kLabel).x - 14.0f);
@@ -401,15 +457,13 @@ void gui::RenderTeamPanels(const CGame& game) {
 	constexpr ImGuiWindowFlags kFlags =
 		ImGuiWindowFlags_NoTitleBar        |
 		ImGuiWindowFlags_NoResize          |
-		ImGuiWindowFlags_NoMove            |
 		ImGuiWindowFlags_NoScrollbar       |
-		ImGuiWindowFlags_AlwaysAutoResize  |
-		ImGuiWindowFlags_NoSavedSettings;
+		ImGuiWindowFlags_AlwaysAutoResize;
 
 	TeamID myTeam = game.localPlayer.ctrl.teamID;
 
-	ImGui::SetNextWindowPos(ImVec2(kPad, kPad), ImGuiCond_Always);
-	ImGui::SetNextWindowSize(ImVec2(kPanelW, 0.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowPos(ImVec2(kPad, kPad), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(kPanelW, 0.0f), ImGuiCond_FirstUseEver);
 	ImGui::Begin("##enemies", nullptr, kFlags);
 
 	ImGui::SetCursorPosX((kPanelW - ImGui::CalcTextSize("ENEMIES").x) * 0.5f);
@@ -421,8 +475,7 @@ void gui::RenderTeamPanels(const CGame& game) {
 	for (int i = 0; i < MAX_ENTITIES; i++) {
 		const CPlayer& p = game.players[i];
 		if (!p.controllerBase || p.ctrl.teamID < TEAM_T || p.ctrl.teamID == myTeam || p.pawn.health == 0) continue;
-		bool isCarrier = (game.bomb.isCarried && game.bomb.carrierSlot == i)
-		              || (game.bomb.entity && !game.bomb.hasDefused && !game.bomb.hasExploded && game.bomb.planterSlot == i);
+		bool isCarrier = game.bomb.isCarried && game.bomb.carrierSlot == i;
 		renderPlayerEntry(p, game, true, isCarrier);
 	}
 	ImGui::End();
@@ -433,23 +486,23 @@ void gui::RenderTeamPanels(const CGame& game) {
 void gui::RenderBombPanel(const CGame& game) {
 	const C_PlantedC4& b = game.bomb;
 
-	// Only show when bomb is planted and local player is CT-side
-	if (!b.entity || game.localPlayer.ctrl.teamID == TEAM_T) return;
+	// Only show when a bomb entity is live; both teams get the timer/site —
+	// useful for T rotates and post-plant peeks, not just CT defuse calls.
+	if (!b.entity) return;
 
 	constexpr float kPanelW = 200.0f;
 	constexpr float kPad    = 10.0f;
 	constexpr ImGuiWindowFlags kFlags =
 		ImGuiWindowFlags_NoTitleBar        |
 		ImGuiWindowFlags_NoResize          |
-		ImGuiWindowFlags_NoMove            |
 		ImGuiWindowFlags_NoScrollbar       |
-		ImGuiWindowFlags_AlwaysAutoResize  |
-		ImGuiWindowFlags_NoSavedSettings;
+		ImGuiWindowFlags_AlwaysAutoResize;
 
-	// Anchor to bottom-left corner
+	// Initial anchor at bottom-left (FirstUseEver — once dragged, ImGui
+	// persists the chosen position to the ini file).
 	ImGuiIO& io = ImGui::GetIO();
-	ImGui::SetNextWindowPos(ImVec2(kPad, io.DisplaySize.y - kPad), ImGuiCond_Always, ImVec2(0.0f, 1.0f));
-	ImGui::SetNextWindowSize(ImVec2(kPanelW, 0.0f), ImGuiCond_Always);
+	ImGui::SetNextWindowPos(ImVec2(kPad, io.DisplaySize.y - kPad), ImGuiCond_FirstUseEver, ImVec2(0.0f, 1.0f));
+	ImGui::SetNextWindowSize(ImVec2(kPanelW, 0.0f), ImGuiCond_FirstUseEver);
 	ImGui::Begin("##bomb", nullptr, kFlags);
 
 	// Title

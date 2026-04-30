@@ -8,6 +8,11 @@
 #include "C_PlantedC4.h"
 #include <unordered_map>
 
+// Windows user-mode pointer range. Torn DMA reads during map transitions can
+// produce values like 0xC3C3C3C3... that pass a null check but dereference to
+// garbage; this bound rejects them.
+inline bool isValidPtr(uint64_t p) { return p > 0x10000 && p < 0x7FFFFFFFFFFF; }
+
 struct mapData {
 	float xBound;
 	float yBound;
@@ -45,4 +50,8 @@ public:
 	CPlayer      players[MAX_ENTITIES];
 	C_PlantedC4  bomb;
 
+	// engine2.dll: SIGNONSTATE_FULL (6) means we're connected and in-game.
+	// Polled by t_NetworkState (500 ms). Render code may use this to gate
+	// behaviour without parsing entity-list/map-name heuristics.
+	uint8_t      signOnState = 0;
 };

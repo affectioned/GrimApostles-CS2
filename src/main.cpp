@@ -1,5 +1,6 @@
 #include "pch.h"
 #include <filesystem>
+#include <future>
 #include "gui.h"
 #include "sdk.h"
 #include "updater.h"
@@ -34,6 +35,13 @@ int main()
 	Log::Info("Loading map bounds and textures");
 	gui::loadMapBounds();
 	gui::loadTextures();
+
+	{
+		auto classFut  = std::async(std::launch::async, updater::fetchClassOffsets);
+		auto moduleFut = std::async(std::launch::async, updater::fetchModuleOffsets);
+		classFut.wait();
+		moduleFut.wait();
+	}
 
 	Log::Info("Starting DMA thread");
 	auto       game = std::make_unique<CGame>();
