@@ -204,18 +204,28 @@ def extract_radars(pak, cli: Path, vpk_path: Path, out_dir: Path, verbose: bool)
 
         _vrf(cli, vpk_path, tmp_out, "vtex_c", _RADAR_VPK_PREFIX, verbose)
 
-        # VRF preserves VPK path structure under tmp_out, so use rglob
-        candidates = list(tmp_out.rglob("*.png")) + list(tmp_out.rglob("*.tga"))
+        # VRF preserves VPK path structure under tmp_out, so use rglob.
+        # Sort so that for maps with multiple variants (e.g. de_cache_radar_psd
+        # AND de_cache_radar_tga), the alphabetically-later variant wins the
+        # dedupe below — preserves the historical "_tga overwrites _psd"
+        # behaviour without writing the same destination twice per run.
+        candidates = sorted(list(tmp_out.rglob("*.png")) + list(tmp_out.rglob("*.tga")))
         if not candidates:
             print("  [radar]  WARNING: VRF produced no image output for radar textures",
                   file=sys.stderr)
 
+        # Dedupe by destination filename: later candidates overwrite earlier
+        # ones in the dict, so e.g. _tga wins over _psd.
+        best: dict[str, Path] = {}
         for img_file in candidates:
             stem = img_file.stem
             if "_radar" not in stem:
                 continue
             # de_dust2_radar_psd → de_dust2_radar.png
             out_name = re.sub(r"_radar.*$", "_radar", stem) + ".png"
+            best[out_name] = img_file
+
+        for out_name, img_file in best.items():
             status = _write_if_changed(out_dir / out_name, img_file.read_bytes())
             if   status == "new":     new_n += 1
             elif status == "updated": upd_n += 1
@@ -257,9 +267,16 @@ def extract_icons(pak, cli: Path, vpk_path: Path, out_dir: Path, icon_height: in
 
         _vrf(cli, vpk_path, tmp_out, "vsvg_c", _ICON_VPK_PREFIX, verbose)
 
-        for svg in tmp_out.rglob("*.svg"):
+        # Dedupe by destination — multiple SVGs can map to the same out_stem via
+        # _NAME_OVERRIDES (e.g. both p2000.svg and hkp2000.svg → hkp2000.png).
+        # Sort first so the alphabetically-later source wins in a stable order.
+        best: dict[str, Path] = {}
+        for svg in sorted(tmp_out.rglob("*.svg")):
             stem     = svg.stem
             out_stem = _NAME_OVERRIDES.get(stem, stem)
+            best[out_stem] = svg
+
+        for out_stem, svg in best.items():
             out_path = out_dir / f"{out_stem}.png"
             try:
                 png_bytes = _svg_to_png(svg.read_bytes(), icon_height)
