@@ -27,3 +27,4 @@ Desktop.ini
 # ========================
 tools/AssetExtractor/vrf/
 tools/AssetExtractor/.venv/
+*.pyc

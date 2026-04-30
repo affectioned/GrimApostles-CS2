@@ -10,7 +10,6 @@ Requires VRF Source2Viewer-CLI.exe in tools/AssetExtractor/vrf/ — see README.m
 
 import io
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -71,6 +70,23 @@ def find_cs2() -> Path | None:
             if candidate.exists():
                 return candidate
     return None
+
+
+# ── Incremental write ──────────────────────────────────────────────────────────
+#
+# Compares new bytes against the file already on disk so re-runs only touch
+# files whose content has actually changed. Lets the extractor pick up Valve's
+# map/icon updates without forcing a full delete-and-re-extract.
+
+def _write_if_changed(path: Path, data: bytes) -> str:
+    """Write bytes to path only if content differs. Returns 'new', 'updated', or 'unchanged'."""
+    if path.exists():
+        if path.read_bytes() == data:
+            return "unchanged"
+        path.write_bytes(data)
+        return "updated"
+    path.write_bytes(data)
+    return "new"
 
 
 # ── VRF CLI ────────────────────────────────────────────────────────────────────
@@ -149,11 +165,12 @@ def _svg_to_png(svg_bytes: bytes, height: int) -> bytes:
 
 # ── Overview txt extraction ────────────────────────────────────────────────────
 
-def extract_overview_txts(pak, out_dir: Path, verbose: bool) -> int:
+def extract_overview_txts(pak, out_dir: Path, verbose: bool) -> tuple[int, int, int]:
     """Extract *_radar.txt bounds files from the VPK (resource/overviews/*.txt).
-    Files are renamed <mapname>_radar.txt to match the PNG naming convention."""
+    Files are renamed <mapname>_radar.txt to match the PNG naming convention.
+    Returns (new, updated, unchanged) counts."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    count = 0
+    new_n = upd_n = unc_n = 0
     for path in pak:
         if not path.startswith("resource/overviews/") or not path.endswith(".txt"):
             continue
@@ -161,22 +178,25 @@ def extract_overview_txts(pak, out_dir: Path, verbose: bool) -> int:
         out_name = stem + "_radar.txt"      # e.g. "de_dust2_radar.txt"
         try:
             data = pak[path].read()
-            (out_dir / out_name).write_bytes(data)
-            count += 1
+            status = _write_if_changed(out_dir / out_name, data)
+            if   status == "new":     new_n += 1
+            elif status == "updated": upd_n += 1
+            else:                     unc_n += 1
             if verbose:
-                print(f"  [overview] {Path(path).name}  ->  {out_name}")
+                print(f"  [overview] {status:9s} {Path(path).name}  ->  {out_name}")
         except Exception as e:
             print(f"  [overview] FAILED {path}: {e}", file=sys.stderr)
-    return count
+    return new_n, upd_n, unc_n
 
 
 # ── Radar extraction ───────────────────────────────────────────────────────────
 
 _RADAR_VPK_PREFIX = "panorama/images/overheadmaps/"
 
-def extract_radars(pak, cli: Path, vpk_path: Path, out_dir: Path, verbose: bool) -> int:
+def extract_radars(pak, cli: Path, vpk_path: Path, out_dir: Path, verbose: bool) -> tuple[int, int, int]:
+    """Extract radar PNGs. Returns (new, updated, unchanged) counts."""
     out_dir.mkdir(parents=True, exist_ok=True)
-    count = 0
+    new_n = upd_n = unc_n = 0
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_out = Path(tmp) / "out"
@@ -196,12 +216,14 @@ def extract_radars(pak, cli: Path, vpk_path: Path, out_dir: Path, verbose: bool)
                 continue
             # de_dust2_radar_psd → de_dust2_radar.png
             out_name = re.sub(r"_radar.*$", "_radar", stem) + ".png"
-            shutil.copy2(img_file, out_dir / out_name)
-            count += 1
+            status = _write_if_changed(out_dir / out_name, img_file.read_bytes())
+            if   status == "new":     new_n += 1
+            elif status == "updated": upd_n += 1
+            else:                     unc_n += 1
             if verbose:
-                print(f"  [radar]  {img_file.name}  ->  {out_name}")
+                print(f"  [radar]  {status:9s} {img_file.name}  ->  {out_name}")
 
-    return count
+    return new_n, upd_n, unc_n
 
 
 # ── Weapon icon extraction ─────────────────────────────────────────────────────
@@ -217,9 +239,17 @@ _ALIASES: dict[str, str] = {
     "usp_silencer_off":  "usp_silencer",
 }
 
-def extract_icons(pak, cli: Path, vpk_path: Path, out_dir: Path, icon_height: int, verbose: bool) -> int:
+def extract_icons(pak, cli: Path, vpk_path: Path, out_dir: Path, icon_height: int, verbose: bool) -> tuple[int, int, int]:
+    """Extract weapon icon PNGs. Returns (new, updated, unchanged) counts."""
     out_dir.mkdir(parents=True, exist_ok=True)
     extracted: dict[str, Path] = {}
+    new_n = upd_n = unc_n = 0
+
+    def _tally(status: str) -> None:
+        nonlocal new_n, upd_n, unc_n
+        if   status == "new":     new_n += 1
+        elif status == "updated": upd_n += 1
+        else:                     unc_n += 1
 
     with tempfile.TemporaryDirectory() as tmp:
         tmp_out = Path(tmp) / "out"
@@ -233,22 +263,24 @@ def extract_icons(pak, cli: Path, vpk_path: Path, out_dir: Path, icon_height: in
             out_path = out_dir / f"{out_stem}.png"
             try:
                 png_bytes = _svg_to_png(svg.read_bytes(), icon_height)
-                out_path.write_bytes(png_bytes)
+                status = _write_if_changed(out_path, png_bytes)
+                _tally(status)
                 extracted[out_stem] = out_path
                 if verbose:
-                    print(f"  [icon]   {svg.name}  ->  {out_stem}.png")
+                    print(f"  [icon]   {status:9s} {svg.name}  ->  {out_stem}.png")
             except Exception as e:
                 print(f"  [icon]   FAILED {svg.name}: {e}", file=sys.stderr)
 
     for alias, source in _ALIASES.items():
         if alias not in extracted and source in extracted:
             dst = out_dir / f"{alias}.png"
-            shutil.copy2(extracted[source], dst)
+            status = _write_if_changed(dst, extracted[source].read_bytes())
+            _tally(status)
             extracted[alias] = dst
             if verbose:
-                print(f"  [icon]   {alias}.png  (copy of {source}.png)")
+                print(f"  [icon]   {status:9s} {alias}.png  (copy of {source}.png)")
 
-    return len(extracted)
+    return new_n, upd_n, unc_n
 
 
 # ── Entry point ────────────────────────────────────────────────────────────────
@@ -289,17 +321,19 @@ def main():
     out_root = Path(args.out)
     print(f"Output   : {out_root.resolve()}\n")
 
+    def _summary(label: str, counts: tuple[int, int, int], dest: Path) -> None:
+        new_n, upd_n, unc_n = counts
+        total = new_n + upd_n + unc_n
+        print(f"{label}: {total} total ({new_n} new, {upd_n} updated, {unc_n} unchanged)  ->  {dest}")
+
     if not args.no_radars:
         pak = vpk.open(str(vpk_path))
-        n = extract_radars(pak, cli, vpk_path, out_root / "maps", args.verbose)
-        print(f"Radars   : {n} extracted  ->  {out_root / 'maps'}")
-        n = extract_overview_txts(pak, out_root / "maps", args.verbose)
-        print(f"Overviews: {n} extracted  ->  {out_root / 'maps'}")
+        _summary("Radars   ", extract_radars(pak, cli, vpk_path, out_root / "maps", args.verbose),  out_root / "maps")
+        _summary("Overviews", extract_overview_txts(pak, out_root / "maps", args.verbose),          out_root / "maps")
 
     if not args.no_icons:
         pak = vpk.open(str(vpk_path))
-        n = extract_icons(pak, cli, vpk_path, out_root / "icons", args.icon_size, args.verbose)
-        print(f"Icons    : {n} extracted  ->  {out_root / 'icons'}")
+        _summary("Icons    ", extract_icons(pak, cli, vpk_path, out_root / "icons", args.icon_size, args.verbose), out_root / "icons")
 
     print("\nDone.")
 

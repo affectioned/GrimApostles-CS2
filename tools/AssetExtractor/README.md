@@ -1,6 +1,6 @@
 # AssetExtractor
 
-Extracts CS2 radar images and weapon icons directly from the game's VPK files and outputs PNGs ready for use alongside GrimApostles CS2.
+Extracts CS2 radar images and weapon icons directly from the game's VPK files and outputs PNGs ready for use alongside CS2 DMA Radar.
 
 ## Requirements
 
@@ -67,7 +67,19 @@ textures/
     ...
 ```
 
-Place the `textures/` folder alongside `GrimApostles CS2.exe` at runtime. The radar overlay loads all maps and icons automatically — no code changes needed when new maps or weapons are added, just re-run the extractor.
+Place the `textures/` folder alongside `CS2_DMA_RADAR.exe` at runtime. The radar overlay loads all maps and icons automatically — no code changes needed when new maps or weapons are added, just re-run the extractor.
+
+## Picking up Valve updates
+
+Re-runs are incremental. Each extracted asset's bytes are compared against the file already on disk; only files whose contents actually changed are rewritten. The end-of-run summary tells you exactly what happened, e.g.:
+
+```
+Radars   : 64 total (1 new, 2 updated, 61 unchanged)  ->  ./textures/maps
+Overviews: 64 total (0 new, 2 updated, 62 unchanged)  ->  ./textures/maps
+Icons    : 52 total (0 new, 0 updated, 52 unchanged)  ->  ./textures/icons
+```
+
+This means after a CS2 patch you can just re-run `run.bat` — no need to delete the existing `textures/` folder. Use `-v` to see the per-file `new`/`updated`/`unchanged` status.
 
 ## How it works
 
